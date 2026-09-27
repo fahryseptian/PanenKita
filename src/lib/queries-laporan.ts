@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { harvests, orders, orderItems, products, user } from "@/lib/db/schema";
+import { co2ePreventedKg } from "./carbon";
 
 /**
  * Rekap laporan bendahara per rentang tanggal (Fase 3).
@@ -19,6 +20,9 @@ export interface LaporanPeriode {
   cancelledCount: number;
   pendingCount: number;
   avgOrder: number | null;
+  // Zero-waste / ESG: limbah satuan kg (dapat dikonversi ke emisi)
+  wasteKg: number;
+  co2ePrevented: number;
   // Per produk
   perProduk: Array<{
     productId: string;
@@ -27,6 +31,7 @@ export interface LaporanPeriode {
     qtySold: number;
     revenue: number;
     qtyHarvested: number;
+    qtyWaste: number;
   }>;
   // Per anggota (panen)
   perAnggota: Array<{
@@ -93,11 +98,13 @@ export async function getLaporanPeriode(
         .groupBy(products.id, products.name, products.unit)
     : [];
 
-  // ---- Per produk: panen pada periode yang sama ----
+  // ---- Per produk: panen pada periode yang sama (termasuk limbah) ----
   const harvestRows = await db
     .select({
       productId: products.id,
       qty: sql<string>`sum(${harvests.quantity})`,
+      waste: sql<string>`sum(${harvests.wasteQty})`,
+      unit: products.unit,
     })
     .from(harvests)
     .innerJoin(products, eq(harvests.productId, products.id))
@@ -108,7 +115,7 @@ export async function getLaporanPeriode(
         lt(harvests.harvestedAt, to),
       ),
     )
-    .groupBy(products.id);
+    .groupBy(products.id, products.unit);
 
   // Gabungkan (produk yang hanya panen / hanya terjual tetap tampil).
   const productMap = new Map<string, LaporanPeriode["perProduk"][number]>();
@@ -120,13 +127,19 @@ export async function getLaporanPeriode(
       qtySold: Number(s.qty),
       revenue: Number(s.revenue),
       qtyHarvested: 0,
+      qtyWaste: 0,
     });
   }
+  let wasteKg = 0;
   for (const h of harvestRows) {
     const existing = productMap.get(h.productId);
     const qtyHarvested = Number(h.qty);
-    if (existing) existing.qtyHarvested = qtyHarvested;
-    else {
+    const qtyWaste = Number(h.waste);
+    if (h.unit === "kg") wasteKg += qtyWaste;
+    if (existing) {
+      existing.qtyHarvested = qtyHarvested;
+      existing.qtyWaste = qtyWaste;
+    } else {
       const [p] = await db
         .select({ name: products.name, unit: products.unit })
         .from(products)
@@ -139,9 +152,11 @@ export async function getLaporanPeriode(
         qtySold: 0,
         revenue: 0,
         qtyHarvested,
+        qtyWaste,
       });
     }
   }
+  wasteKg = Math.round(wasteKg * 100) / 100;
   const perProduk = [...productMap.values()].sort((a, b) => b.revenue - a.revenue || b.qtyHarvested - a.qtyHarvested);
 
   // ---- Per anggota: kontribusi panen ----
@@ -180,6 +195,8 @@ export async function getLaporanPeriode(
     cancelledCount,
     pendingCount,
     avgOrder: paidCount > 0 ? Math.round(totalPaid / paidCount) : null,
+    wasteKg,
+    co2ePrevented: co2ePreventedKg(wasteKg),
     perProduk,
     perAnggota,
   };

@@ -38,6 +38,8 @@ export const harvestInputSchema = z.object({
     .number()
     .positive("Jumlah harus lebih dari 0")
     .max(100_000),
+  /** Bagian yang tidak layak jual (susut/busuk); default 0. */
+  wasteQty: z.coerce.number().min(0).max(100_000).default(0),
   quality: z.enum(["A", "B", "C"]).default("A"),
   note: z.string().trim().max(200).optional(),
 });

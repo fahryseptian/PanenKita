@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { harvests, orderItems, orders, products } from "@/lib/db/schema";
 
@@ -34,7 +34,8 @@ export async function getAvailableStock(
     db
       .select({
         productId: harvests.productId,
-        total: harvests.quantity,
+        // Limbah (wasteQty) tidak masuk stok jual — barang busuk tidak dijual.
+        total: sql<string>`(${harvests.quantity} - ${harvests.wasteQty})`,
       })
       .from(harvests)
       .where(inArray(harvests.productId, productIds)),

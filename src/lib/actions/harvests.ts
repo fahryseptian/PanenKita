@@ -25,10 +25,14 @@ export async function recordHarvest(formData: FormData): Promise<void> {
     .limit(1);
   if (!product) return;
 
+  // Limbah tidak boleh melebihi total panen.
+  const waste = Math.min(input.wasteQty, input.quantity);
+
   await db.insert(harvests).values({
     productId: product.id,
     memberId: ctx.userId,
     quantity: String(input.quantity),
+    wasteQty: String(waste),
     quality: input.quality,
     note: input.note || null,
   });
@@ -54,6 +58,7 @@ export async function recordHarvest(formData: FormData): Promise<void> {
     unit: product.unit,
     quality: input.quality,
   });
+
   await Promise.allSettled(
     admins
       .filter((a) => a.phone)
@@ -61,6 +66,34 @@ export async function recordHarvest(formData: FormData): Promise<void> {
   );
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/panen");
+  revalidatePath("/katalog");
+}
+
+/**
+ * Admin mencatat susut/limbah pada panen yang sudah ada (mis. sebagian busuk
+ * saat penyimpanan). Limbah mengurangi stok jual & masuk perhitungan ESG.
+ */
+export async function updateHarvestWaste(formData: FormData): Promise<void> {
+  const ctx = await requireKwtContext();
+  if (!ctx.isAdmin) return;
+  const id = String(formData.get("id") ?? "");
+  const waste = Number(formData.get("wasteQty") ?? 0);
+  if (!id || !Number.isFinite(waste) || waste < 0) return;
+
+  const [row] = await db
+    .select({ id: harvests.id, productId: harvests.productId, quantity: harvests.quantity })
+    .from(harvests)
+    .innerJoin(products, eq(harvests.productId, products.id))
+    .where(and(eq(harvests.id, id), eq(products.kwtId, ctx.kwtId)))
+    .limit(1);
+  if (!row) return;
+
+  await db
+    .update(harvests)
+    .set({ wasteQty: String(Math.min(waste, Number(row.quantity))) })
+    .where(eq(harvests.id, id));
+  await recomputeProductPrice(row.productId);
   revalidatePath("/dashboard/panen");
   revalidatePath("/katalog");
 }

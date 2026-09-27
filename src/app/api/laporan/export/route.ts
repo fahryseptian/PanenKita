@@ -47,7 +47,7 @@ export async function GET(req: Request) {
 
   // ---- Bagian 1: ringkasan + rekap per produk ----
   const produkRows: Array<Array<string | number>> = laporan.perProduk.map(
-    (p) => [p.productName, p.unit, p.qtySold, p.qtyHarvested, p.revenue],
+    (p) => [p.productName, p.unit, p.qtySold, p.qtyHarvested, p.qtyWaste, p.revenue],
   );
 
   // ---- Bagian 2: kontribusi panen anggota ----
@@ -61,12 +61,16 @@ export async function GET(req: Request) {
       [[`Periode: ${labelDari} s.d. ${labelSampai}`]],
     ),
     toCsv(
-      ["Produk", "Satuan", "Terjual", "Panen", "Pendapatan (Rp)"],
+      ["Produk", "Satuan", "Terjual", "Panen", "Tidak Layak Jual", "Pendapatan (Rp)"],
       produkRows,
     ),
     toCsv(
       ["Kontribusi Panen Anggota", "Kali Panen", "Total Panen (kg)"],
       anggotaRows,
+    ),
+    toCsv(
+      ["Emisi Karbon Terhindar (zero-waste)"],
+      [[`Limbah dicegah: ${laporan.wasteKg} kg`], [`CO2e terhindar: ${laporan.co2ePrevented} kg`]],
     ),
   ].join("");
 

@@ -180,6 +180,7 @@ export interface HarvestRow {
   memberName: string;
   memberId: string;
   quantity: number;
+  wasteQty: number;
   quality: string;
   note: string | null;
   harvestedAt: Date;
@@ -198,6 +199,7 @@ export async function getHarvests(
       memberName: user.name,
       memberId: harvests.memberId,
       quantity: harvests.quantity,
+      wasteQty: harvests.wasteQty,
       quality: harvests.quality,
       note: harvests.note,
       harvestedAt: harvests.harvestedAt,
@@ -211,7 +213,11 @@ export async function getHarvests(
 
   return rows
     .filter((r) => !opts.memberId || r.memberId === opts.memberId)
-    .map((r) => ({ ...r, quantity: Number(r.quantity) }));
+    .map((r) => ({
+      ...r,
+      quantity: Number(r.quantity),
+      wasteQty: Number(r.wasteQty),
+    }));
 }
 
 // ---------------------------------------------------------------------------

@@ -77,6 +77,23 @@ export function HarvestForm({ products }: Props) {
           />
         </div>
         <div>
+          <label htmlFor="wasteQty" className="mb-1 block text-sm font-medium text-slate-700">
+            Tidak layak jual <span className="text-slate-400">(susut/busuk, opsional)</span>
+          </label>
+          <input
+            id="wasteQty"
+            name="wasteQty"
+            type="number"
+            step="0.01"
+            min="0"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            placeholder="0"
+          />
+          <p className="mt-1 text-xs text-slate-400">
+            Tidak masuk stok jual, tapi dihitung sebagai emisi terhindar di laporan.
+          </p>
+        </div>
+        <div>
           <label htmlFor="quality" className="mb-1 block text-sm font-medium text-slate-700">
             Kualitas
           </label>

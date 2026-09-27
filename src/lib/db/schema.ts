@@ -203,6 +203,13 @@ export const harvests = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
+    /**
+     * Bagian panen yang tidak terjual (susut/busuk) — tidak masuk stok jual.
+     * Dasar perhitungan emisi terhindar (zero-waste / ESG).
+     */
+    wasteQty: numeric("waste_qty", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
     harvestedAt: timestamp("harvested_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

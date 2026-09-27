@@ -5,7 +5,7 @@ import { products } from "@/lib/db/schema";
 import { requireKwtContext } from "@/lib/session";
 import { getHarvests } from "@/lib/queries";
 import { formatQuantity, timeAgo } from "@/lib/format";
-import { deleteHarvest, recordHarvest } from "@/lib/actions/harvests";
+import { deleteHarvest, recordHarvest, updateHarvestWaste } from "@/lib/actions/harvests";
 import { HarvestForm } from "./harvest-form";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +58,7 @@ export default async function HarvestPage() {
                 </p>
                 <p className="text-xs text-slate-400">
                   {h.memberName} · {timeAgo(h.harvestedAt)}
+                  {h.wasteQty > 0 ? ` · busuk ${formatQuantity(h.wasteQty)} ${h.unit}` : ""}
                   {h.note ? ` · ${h.note}` : ""}
                 </p>
               </div>
@@ -65,6 +66,29 @@ export default async function HarvestPage() {
                 <span className="text-sm font-semibold tabular-nums">
                   {formatQuantity(h.quantity)} {h.unit}
                 </span>
+                {ctx.isAdmin && (
+                  <form action={updateHarvestWaste} className="flex items-center gap-1">
+                    <input type="hidden" name="id" value={h.id} />
+                    <input
+                      type="number"
+                      name="wasteQty"
+                      step="0.01"
+                      min="0"
+                      max={h.quantity}
+                      defaultValue={h.wasteQty > 0 ? h.wasteQty : undefined}
+                      title="Catat susut/busuk (tidak masuk stok jual)"
+                      placeholder="busuk"
+                      className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500"
+                    />
+                    <button
+                      type="submit"
+                      title="Simpan limbah"
+                      className="rounded-lg px-2 py-1 text-xs font-medium text-slate-400 hover:bg-brand-50 hover:text-brand-700"
+                    >
+                      OK
+                    </button>
+                  </form>
+                )}
                 {(ctx.isAdmin || h.memberId === ctx.userId) && (
                   <form action={deleteHarvest}>
                     <input type="hidden" name="id" value={h.id} />

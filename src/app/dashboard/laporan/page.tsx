@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/session";
 import { getLaporanPeriode } from "@/lib/queries-laporan";
 import { resolveReportRange, formatYmd } from "@/lib/report-period";
 import { formatRupiah, formatQuantity } from "@/lib/format";
+import { carKmEquivalent, formatCo2 } from "@/lib/carbon";
 
 export const dynamic = "force-dynamic";
 
@@ -108,6 +109,22 @@ export default async function LaporanPage({
         </div>
       </form>
 
+      {/* Zero-waste / ESG */}
+      {laporan.wasteKg > 0 && (
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+          <h2 className="text-sm font-semibold text-emerald-800">
+            🌱 Emisi karbon terhindar (zero-waste)
+          </h2>
+          <p className="mt-1 text-sm text-emerald-700">
+            {formatQuantity(laporan.wasteKg)} kg hasil panen yang tadinya berisiko
+            terbuang tersalurkan sebagai stok katalog — setara mencegah{" "}
+            <strong>{formatCo2(laporan.co2ePrevented)}</strong> (≈{" "}
+            {carKmEquivalent(laporan.co2ePrevented).toLocaleString("id-ID")} km
+            berkendara mobil).
+          </p>
+        </section>
+      )}
+
       {/* Ringkasan kas */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
@@ -160,6 +177,7 @@ export default async function LaporanPage({
                   <th className="px-5 py-2 font-medium">Produk</th>
                   <th className="px-3 py-2 text-right font-medium">Terjual</th>
                   <th className="px-3 py-2 text-right font-medium">Panen</th>
+                  <th className="px-3 py-2 text-right font-medium">Busuk</th>
                   <th className="px-5 py-2 text-right font-medium">Pendapatan</th>
                 </tr>
               </thead>
@@ -172,6 +190,9 @@ export default async function LaporanPage({
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">
                       {formatQuantity(p.qtyHarvested)} {p.unit}
+                    </td>
+                    <td className={`px-3 py-2.5 text-right tabular-nums ${p.qtyWaste > 0 ? "text-red-500" : "text-slate-300"}`}>
+                      {p.qtyWaste > 0 ? `${formatQuantity(p.qtyWaste)} ${p.unit}` : "—"}
                     </td>
                     <td className="px-5 py-2.5 text-right font-semibold tabular-nums">
                       {formatRupiah(p.revenue)}
