@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const productName = process.env.NEXT_PUBLIC_PRODUCT_NAME ?? "PanenKita";
 
 export const metadata: Metadata = {
