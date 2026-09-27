@@ -12,7 +12,11 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SHARED_SECRET;
-  const provided = req.headers.get("x-cron-secret");
+  const provided =
+    req.headers.get("x-cron-secret") ??
+    // Vercel Cron otomatis mengirim `Authorization: Bearer $CRON_SECRET`
+    // jika env CRON_SECRET diset di proyek Vercel.
+    req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (secret && provided !== secret) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
