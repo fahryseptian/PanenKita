@@ -341,6 +341,7 @@ export async function getPricingRules(kwtId: string) {
       surgePercent: pricingRules.surgePercent,
       minPricePercent: pricingRules.minPricePercent,
       maxPricePercent: pricingRules.maxPricePercent,
+      wholesaleTiers: pricingRules.wholesaleTiers,
     })
     .from(pricingRules)
     .innerJoin(products, eq(pricingRules.productId, products.id))

@@ -6,6 +6,10 @@ import {
 } from "@/lib/queries";
 import { formatRupiah, formatDateTime } from "@/lib/format";
 import { recomputeAllPrices } from "@/lib/actions/pricing";
+import { saveWholesaleTiers, saveCommissionSettings } from "@/lib/actions/monetisasi";
+import { getKwtFeeSummary } from "@/lib/fees-db";
+import { DEFAULT_COMMISSION } from "@/lib/komisi";
+import type { WholesaleTier } from "@/lib/wholesale";
 import { DEFAULT_RULE } from "@/lib/pricing";
 import { RecomputeButton } from "./recompute-button";
 
@@ -15,12 +19,23 @@ export const metadata = { title: "Harga" };
 
 export default async function PricingPage() {
   const ctx = await requireAdmin();
-  const [products, rules, events] = await Promise.all([
+  const [products, rules, events, feeSummary] = await Promise.all([
     getDashboardProducts(ctx.kwtId),
     getPricingRules(ctx.kwtId),
     getPricingEvents(ctx.kwtId, 30),
+    getKwtFeeSummary(ctx.kwtId),
   ]);
   const ruleByProduct = new Map(rules.map((r) => [r.productId, r]));
+  const tiersText = (raw: string | null): string => {
+    if (!raw) return "";
+    try {
+      return (JSON.parse(raw) as WholesaleTier[])
+        .map((t) => `${t.minQty}:${t.percentOff}`)
+        .join(", ");
+    } catch {
+      return "";
+    }
+  };
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -60,9 +75,61 @@ export default async function PricingPage() {
         </p>
       </section>
 
+      {/* Komisi platform */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Komisi platform</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Dipotong otomatis dari transaksi terbayar. Terkumpul sejauh ini:{" "}
+              <b>{formatRupiah(feeSummary.totalFee)}</b> dari {feeSummary.feeCount} transaksi
+              (bersih KWT {formatRupiah(feeSummary.netTotal)}).
+            </p>
+          </div>
+        </div>
+        <form action={saveCommissionSettings} className="mt-3 grid gap-3 sm:grid-cols-6">
+          {[
+            { name: "ratePercent", label: "Rate %", def: DEFAULT_COMMISSION.ratePercent },
+            { name: "handlingFee", label: "Handling Rp", def: DEFAULT_COMMISSION.handlingFee },
+            { name: "minOrderValue", label: "Min. order Rp", def: DEFAULT_COMMISSION.minOrderValue },
+            { name: "discountThreshold", label: "Diskon ≥ Rp", def: DEFAULT_COMMISSION.discountThreshold },
+            { name: "discountPercent", label: "Diskon %", def: DEFAULT_COMMISSION.discountPercent },
+          ].map((f) => (
+            <div key={f.name}>
+              <label htmlFor={f.name} className="mb-1 block text-xs font-medium text-slate-500">
+                {f.label}
+              </label>
+              <input
+                id={f.name}
+                name={f.name}
+                type="number"
+                min={0}
+                defaultValue={f.def}
+                className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm tabular-nums outline-none focus:border-brand-500"
+              />
+            </div>
+          ))}
+          <div className="flex items-end gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-slate-600">
+              <input type="checkbox" name="enabled" defaultChecked className="h-4 w-4" />
+              Aktif
+            </label>
+            <button
+              type="submit"
+              className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-900"
+            >
+              Simpan
+            </button>
+          </div>
+        </form>
+      </section>
+
       <section className="rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="font-semibold">Harga sekarang</h2>
+          <h2 className="font-semibold">Harga sekarang & tier grosir</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Harga grosir otomatis berlaku di form pesan, mis. format tier: <code>10:5, 50:10</code> = ≥10 kuantitas −5%, ≥50 −10%.
+          </p>
         </div>
         <div className="divide-y divide-slate-50">
           {products.map((p) => {
@@ -74,20 +141,37 @@ export default async function PricingPage() {
             const zone =
               p.available <= low ? "red" : p.available >= high ? "blue" : "green";
             return (
-              <div key={p.id} className="flex items-center justify-between px-5 py-3">
-                <div>
-                  <p className="text-sm font-medium">{p.name}</p>
-                  <p className="text-xs text-slate-400">
-                    stok {p.available} {p.unit} · zona{" "}
-                    {zone === "red" ? "menipis" : zone === "blue" ? "menumpuk" : "normal"}
-                  </p>
+              <div key={p.id} className="px-5 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-slate-400">
+                      stok {p.available} {p.unit} · zona{" "}
+                      {zone === "red" ? "menipis" : zone === "blue" ? "menumpuk" : "normal"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold tabular-nums text-brand-700">
+                      {formatRupiah(p.currentPrice)}
+                    </p>
+                    <p className="text-xs text-slate-400">dasar {formatRupiah(p.basePrice)}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold tabular-nums text-brand-700">
-                    {formatRupiah(p.currentPrice)}
-                  </p>
-                  <p className="text-xs text-slate-400">dasar {formatRupiah(p.basePrice)}</p>
-                </div>
+                <form action={saveWholesaleTiers} className="mt-2 flex items-center gap-2">
+                  <input type="hidden" name="productId" value={p.id} />
+                  <input
+                    name="tiers"
+                    defaultValue={tiersText(rule?.wholesaleTiers ?? null)}
+                    placeholder="10:5, 50:10 (kosong = tanpa grosir)"
+                    className="w-72 rounded-lg border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-brand-50 hover:text-brand-700"
+                  >
+                    Simpan tier
+                  </button>
+                </form>
               </div>
             );
           })}

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { kwtMembers, orderItems, orders, products, user } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/session";
@@ -10,6 +10,10 @@ import { recomputeProductPrice } from "@/lib/pricing-db";
 import { getAvailableStock } from "@/lib/stock";
 import { sendWa, newOrderMessage, orderPaidMessage } from "@/lib/wa";
 import { formatRupiah } from "@/lib/format";
+import { recordPlatformFee } from "@/lib/fees-db";
+import { wholesaleLineTotal, activeTier } from "@/lib/wholesale";
+import { pricingRules } from "@/lib/db/schema";
+import type { WholesaleTier } from "@/lib/wholesale";
 
 const ORDER_STATUSES = ["paid", "processing", "completed", "cancelled"] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -47,12 +51,29 @@ export async function placeOrder(
   const byId = new Map(productRows.filter((p) => ids.includes(p.id)).map((p) => [p.id, p]));
   if (byId.size === 0) return { ok: false, error: "Produk tidak tersedia" };
 
-  // Validasi stok on-the-fly
+  // Validasi stok on-the-fly + harga grosir bertingkat per baris.
   const stock = await getAvailableStock([...byId.keys()]);
+  const tierRows = await db
+    .select({ productId: pricingRules.productId, tiers: pricingRules.wholesaleTiers })
+    .from(pricingRules)
+    .where(inArray(pricingRules.productId, [...byId.keys()]));
+  const tiersByProduct = new Map<string, WholesaleTier[]>(
+    tierRows.map((r) => {
+      let tiers: WholesaleTier[] = [];
+      try {
+        tiers = r.tiers ? (JSON.parse(r.tiers) as WholesaleTier[]) : [];
+      } catch {
+        tiers = [];
+      }
+      return [r.productId ?? "", tiers];
+    }),
+  );
+
   const lines: Array<{
     product: (typeof products.$inferSelect)["id"] extends string ? typeof productRows[number] : never;
     quantity: number;
     unitPrice: number;
+    wholesalePercent: number;
   }> = [];
   for (const item of parsed.data.items) {
     const p = byId.get(item.productId);
@@ -61,7 +82,15 @@ export async function placeOrder(
     if (item.quantity > available) {
       return { ok: false, error: `Stok ${p.name} tinggal ${available} ${p.unit}` };
     }
-    lines.push({ product: p as never, quantity: item.quantity, unitPrice: p.currentPrice });
+    const tiers = tiersByProduct.get(p.id) ?? [];
+    const tier = activeTier(item.quantity, tiers);
+    const unitPrice = wholesaleLineTotal(p.currentPrice, item.quantity, tiers) / item.quantity;
+    lines.push({
+      product: p as never,
+      quantity: item.quantity,
+      unitPrice: Math.round(unitPrice),
+      wholesalePercent: tier?.percentOff ?? 0,
+    });
   }
   if (lines.length === 0) return { ok: false, error: "Produk keranjang kosong" };
 
@@ -91,6 +120,7 @@ export async function placeOrder(
       productId: l.product.id,
       quantity: String(l.quantity),
       unitPrice: l.unitPrice,
+      wholesalePercent: l.wholesalePercent,
     })),
   );
 
@@ -154,6 +184,7 @@ export async function updateOrderStatus(formData: FormData): Promise<void> {
   const patch: Partial<typeof orders.$inferInsert> = { status: status as OrderStatus };
   if (status === "paid" && !order.paymentSettledAt) {
     patch.paymentSettledAt = new Date();
+    await recordPlatformFee({ id: order.id, kwtId: order.kwtId, total: order.total });
   }
   await db.update(orders).set(patch).where(eq(orders.id, orderId));
 
@@ -179,6 +210,7 @@ export async function confirmPayment(formData: FormData): Promise<void> {
     .update(orders)
     .set({ status: "paid", paymentSettledAt: new Date() })
     .where(eq(orders.id, orderId));
+  await recordPlatformFee({ id: order.id, kwtId: ctx.kwtId, total: order.total });
 
   await sendWa(
     "order_paid",

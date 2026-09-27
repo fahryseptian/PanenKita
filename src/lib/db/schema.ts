@@ -265,10 +265,62 @@ export const orderItems = pgTable(
     quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
     /** Snapshot harga saat pesanan dibuat (rupiah integer) */
     unitPrice: integer("unit_price").notNull(),
+    /** Diskon grosir yang diterapkan pada baris ini (poin persen). */
+    wholesalePercent: integer("wholesale_percent").notNull().default(0),
   },
   (t) => [
     index("order_items_order_idx").on(t.orderId),
     index("order_items_product_idx").on(t.productId),
+  ],
+);
+
+/**
+ * Pengaturan komisi platform per KWT (take-rate). Null/absen = pakai default
+ * global; semua transaksi terbayar tercatat di platform_fees.
+ */
+export const kwtCommissionSettings = pgTable(
+  "kwt_commission_settings",
+  {
+    kwtId: uuid("kwt_id")
+      .primaryKey()
+      .references(() => kwts.id, { onDelete: "cascade" }),
+    ratePercent: integer("rate_percent").notNull().default(2),
+    handlingFee: integer("handling_fee").notNull().default(500),
+    minOrderValue: integer("min_order_value").notNull().default(10_000),
+    discountThreshold: integer("discount_threshold").notNull().default(1_000_000),
+    discountPercent: integer("discount_percent").notNull().default(1),
+    /** true = KWT dikenakan komisi (bisa dimatikan per kelompok). */
+    enabled: boolean("enabled").notNull().default(true),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
+/** Ledger fee platform per pesanan terbayar (sumber pendapatan platform). */
+export const platformFees = pgTable(
+  "platform_fees",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    kwtId: uuid("kwt_id")
+      .notNull()
+      .references(() => kwts.id, { onDelete: "cascade" }),
+    orderTotal: integer("order_total").notNull(),
+    ratePercent: integer("rate_percent").notNull(),
+    commissionFee: integer("commission_fee").notNull(),
+    handlingFee: integer("handling_fee").notNull(),
+    totalFee: integer("total_fee").notNull(),
+    netToKwt: integer("net_to_kwt").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("platform_fees_order_key").on(t.orderId),
+    index("platform_fees_kwt_time_idx").on(t.kwtId, t.createdAt),
   ],
 );
 
@@ -280,6 +332,8 @@ export const pricingRules = pgTable(
     productId: uuid("product_id").references(() => products.id, {
       onDelete: "cascade",
     }),
+    /** Tier harga grosir (JSON): [{minQty, percentOff}] — null = tanpa grosir */
+    wholesaleTiers: text("wholesale_tiers"),
     /** Ambang stok: jika available <= lowStockThreshold -> markup */
     lowStockThreshold: numeric("low_stock_threshold", {
       precision: 12,

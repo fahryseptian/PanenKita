@@ -5,6 +5,10 @@ import { getCatalog, getKwtBySlug } from "@/lib/queries";
 import { formatRupiah, formatDate } from "@/lib/format";
 import { canonicalCategory, categoryLabel } from "@/lib/categories";
 import { photoSrc } from "@/lib/photo-url";
+import { db } from "@/lib/db";
+import { pricingRules } from "@/lib/db/schema";
+import { inArray } from "drizzle-orm";
+import type { WholesaleTier } from "@/lib/wholesale";
 import { OrderForm } from "./order-form";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +35,22 @@ export default async function CatalogPage({ params, searchParams }: Props) {
   if (!kwt) notFound();
 
   const items = await getCatalog(kwt.id);
+  // Tier grosir per produk untuk form pesan.
+  const tierRows = items.length
+    ? await db
+        .select({ productId: pricingRules.productId, tiers: pricingRules.wholesaleTiers })
+        .from(pricingRules)
+        .where(inArray(pricingRules.productId, items.map((i) => i.id)))
+    : [];
+  const tiersOf = (productId: string): WholesaleTier[] => {
+    const raw = tierRows.find((r) => r.productId === productId)?.tiers;
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw) as WholesaleTier[];
+    } catch {
+      return [];
+    }
+  };
   // Kategori kanonik dari produk yang ada, terurut sesuai daftar resmi.
   const ORDER = [
     "sayur",
@@ -133,6 +153,7 @@ export default async function CatalogPage({ params, searchParams }: Props) {
                   unit: i.unit,
                   price: i.currentPrice,
                   available: Math.max(0, i.stock?.available ?? 0),
+                  tiers: tiersOf(i.id),
                 }))}
               />
             </section>

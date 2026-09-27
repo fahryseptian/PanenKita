@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { harvests, orders, orderItems, products, user } from "@/lib/db/schema";
 import { co2ePreventedKg } from "./carbon";
+import { getKwtFeeSummary } from "./fees-db";
 
 /**
  * Rekap laporan bendahara per rentang tanggal (Fase 3).
@@ -23,6 +24,10 @@ export interface LaporanPeriode {
   // Zero-waste / ESG: limbah satuan kg (dapat dikonversi ke emisi)
   wasteKg: number;
   co2ePrevented: number;
+  // Komisi platform pada pesanan terbayar periode ini
+  feeCount: number;
+  platformFee: number;
+  netToKwt: number;
   // Per produk
   perProduk: Array<{
     productId: string;
@@ -160,6 +165,8 @@ export async function getLaporanPeriode(
   const perProduk = [...productMap.values()].sort((a, b) => b.revenue - a.revenue || b.qtyHarvested - a.qtyHarvested);
 
   // ---- Per anggota: kontribusi panen ----
+  const feeSummary = await getKwtFeeSummary(kwtId);
+
   const memberRows = await db
     .select({
       memberId: harvests.memberId,
@@ -197,6 +204,9 @@ export async function getLaporanPeriode(
     avgOrder: paidCount > 0 ? Math.round(totalPaid / paidCount) : null,
     wasteKg,
     co2ePrevented: co2ePreventedKg(wasteKg),
+    feeCount: feeSummary.feeCount,
+    platformFee: feeSummary.totalFee,
+    netToKwt: feeSummary.netTotal,
     perProduk,
     perAnggota,
   };

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
 import { mapTransactionStatus, verifySignature } from "@/lib/midtrans";
 import { sendWa, orderPaidMessage } from "@/lib/wa";
+import { recordPlatformFee } from "@/lib/fees-db";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
       .update(orders)
       .set({ status: "paid", paymentSettledAt: new Date() })
       .where(eq(orders.id, order.id));
+    await recordPlatformFee({ id: order.id, kwtId: order.kwtId, total: order.total });
     await sendWa(
       "order_paid",
       order.kwtId,

@@ -109,6 +109,24 @@ export default async function LaporanPage({
         </div>
       </form>
 
+      {/* Komisi platform */}
+      {laporan.feeCount > 0 && (
+        <p className="text-xs text-slate-500">
+          Termasuk komisi platform {formatRupiah(laporan.platformFee)} dari{" "}
+          {laporan.feeCount} transaksi terbayar — penerimaan bersih KWT{" "}
+          <b>{formatRupiah(laporan.netToKwt)}</b>.
+        </p>
+      )}
+
+      <div className="flex justify-end">
+        <Link
+          href={`/dashboard/laporan/cetak${exportQuery.replace("/api/laporan/export", "") || (sp.preset ? `?preset=${sp.preset}` : "")}`}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-brand-50 hover:text-brand-700"
+        >
+          🖨️ Versi cetak ESG
+        </Link>
+      </div>
+
       {/* Zero-waste / ESG */}
       {laporan.wasteKg > 0 && (
         <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">

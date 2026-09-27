@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, ShoppingBasket } from "lucide-react";
+import { wholesaleUnitPrice, activeTier } from "@/lib/wholesale";
+import type { WholesaleTier } from "@/lib/wholesale";
 
 interface ProductOption {
   id: string;
@@ -10,6 +12,7 @@ interface ProductOption {
   unit: string;
   price: number;
   available: number;
+  tiers: WholesaleTier[];
 }
 
 interface Props {
@@ -33,7 +36,8 @@ export function OrderForm({ kwtId, kwtSlug, products }: Props) {
         .map(([id, qty]) => {
           const p = products.find((x) => x.id === id);
           if (!p || qty <= 0) return null;
-          return { ...p, qty, subtotal: p.price * qty };
+          const unit = wholesaleUnitPrice(p.price, qty, p.tiers);
+          return { ...p, qty, unitPrice: unit, subtotal: unit * qty };
         })
         .filter((x): x is NonNullable<typeof x> => x !== null),
     [cart, products],
@@ -98,7 +102,22 @@ export function OrderForm({ kwtId, kwtSlug, products }: Props) {
                   <p className="font-medium">{p.name}</p>
                   <p className="text-xs text-slate-500">
                     {p.price.toLocaleString("id-ID")} / {p.unit} · stok {p.available}
+                    {p.tiers.length > 0 && (
+                      <span className="ml-1 text-brand-600">
+                        · grosir{" "}
+                        {p.tiers.map((t) => `≥${t.minQty} −${t.percentOff}%`).join(", ")}
+                      </span>
+                    )}
                   </p>
+                  {(() => {
+                    const q = cart[p.id] ?? 0;
+                    const tier = activeTier(q, p.tiers);
+                    return tier ? (
+                      <p className="text-xs font-medium text-brand-700">
+                        Diskon grosir −{tier.percentOff}% aktif
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="flex items-center gap-1">
                   <button
@@ -191,6 +210,11 @@ export function OrderForm({ kwtId, kwtSlug, products }: Props) {
               <div key={l.id} className="flex justify-between">
                 <span className="text-slate-600">
                   {l.name} × {l.qty}
+                  {l.unitPrice !== l.price && (
+                    <span className="ml-1 text-xs text-brand-600">
+                      @{l.unitPrice.toLocaleString("id-ID")}
+                    </span>
+                  )}
                 </span>
                 <span className="tabular-nums">{l.subtotal.toLocaleString("id-ID")}</span>
               </div>
