@@ -1,6 +1,10 @@
 import Link from "next/link";
-import { Leaf, MapPin, Search, Sprout, Users } from "lucide-react";
-import { getDirectory, getPlatformStats } from "@/lib/queries-directory";
+import { Leaf, MapPin, Search, Sprout, Users, X } from "lucide-react";
+import {
+  getDirectory,
+  getDirectoryFacets,
+  getPlatformStats,
+} from "@/lib/queries-directory";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +13,30 @@ export const metadata = { title: "Katalog" };
 export default async function KatalogIndexPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; provinsi?: string; kabupaten?: string }>;
 }) {
-  const { q } = await searchParams;
-  const [groups, stats] = await Promise.all([getDirectory(q), getPlatformStats()]);
+  const { q, provinsi, kabupaten } = await searchParams;
+  const filter = { q, province: provinsi, regency: kabupaten };
+  const [groups, facets, stats] = await Promise.all([
+    getDirectory(filter),
+    getDirectoryFacets(),
+    getPlatformStats(),
+  ]);
+
+  // Query string helper: mempertahankan q saat toggle chip provinsi/kabupaten.
+  const qs = (params: Record<string, string | undefined>) => {
+    const sp = new URLSearchParams();
+    const merged = { q, provinsi, kabupaten, ...params };
+    for (const [k, v] of Object.entries(merged)) if (v) sp.set(k, v);
+    const s = sp.toString();
+    return s ? `?${s}` : "";
+  };
+
+  // Kabupaten yang tersedia mengikuti provinsi terpilih (atau semua).
+  const regencyOptions = facets.regencies.filter(
+    (r) => !provinsi || r.province === provinsi,
+  );
+  const hasRegionFilter = Boolean(provinsi || kabupaten);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -61,6 +85,8 @@ export default async function KatalogIndexPage({
               className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             />
           </div>
+          {provinsi && <input type="hidden" name="provinsi" value={provinsi} />}
+          {kabupaten && <input type="hidden" name="kabupaten" value={kabupaten} />}
           <button
             type="submit"
             className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
@@ -68,6 +94,73 @@ export default async function KatalogIndexPage({
             Cari
           </button>
         </form>
+
+        {/* Filter daerah */}
+        <div className="mt-4 space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Provinsi
+            </span>
+            {facets.provinces.length === 0 && (
+              <span className="text-xs text-slate-400">Belum ada data wilayah</span>
+            )}
+            {facets.provinces.map((p) => {
+              const active = provinsi === p.province;
+              return (
+                <Link
+                  key={p.province}
+                  href={`/katalog${
+                    active
+                      ? qs({ provinsi: undefined, kabupaten: undefined })
+                      : qs({ provinsi: p.province, kabupaten: undefined })
+                  }`}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                    active
+                      ? "bg-brand-600 text-white"
+                      : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
+                  }`}
+                >
+                  {p.province} ({p.kwtCount})
+                </Link>
+              );
+            })}
+          </div>
+          {provinsi && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Kab/Kota
+              </span>
+              {regencyOptions.map((r) => {
+                const active = kabupaten === r.regency;
+                return (
+                  <Link
+                    key={`${r.province}-${r.regency}`}
+                    href={`/katalog${
+                      active
+                        ? qs({ kabupaten: undefined })
+                        : qs({ kabupaten: r.regency })
+                    }`}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                      active
+                        ? "bg-brand-600 text-white"
+                        : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
+                    }`}
+                  >
+                    {r.regency} ({r.kwtCount})
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+          {hasRegionFilter && (
+            <Link
+              href={`/katalog${qs({ provinsi: undefined, kabupaten: undefined })}`}
+              className="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-600"
+            >
+              <X className="h-3 w-3" /> Hapus filter daerah
+            </Link>
+          )}
+        </div>
 
         {groups.length === 0 ? (
           <p className="mt-10 rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-500">

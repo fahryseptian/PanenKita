@@ -1,4 +1,4 @@
-import { count, eq, ilike, or, sql } from "drizzle-orm";
+import { and, count, eq, ilike, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { kwtMembers, kwts, products } from "@/lib/db/schema";
 
@@ -13,16 +13,33 @@ export interface DirectoryRow {
   memberCount: number;
 }
 
-/** Direktori KWT untuk katalog publik, dengan pencarian nama/daerah. */
-export async function getDirectory(q?: string): Promise<DirectoryRow[]> {
+export interface DirectoryFilter {
+  q?: string;
+  province?: string;
+  regency?: string;
+}
+
+/** Direktori KWT untuk katalog publik, dengan pencarian & filter daerah. */
+export async function getDirectory(
+  filter: string | DirectoryFilter = {},
+): Promise<DirectoryRow[]> {
+  const { q, province, regency } =
+    typeof filter === "string" ? { q: filter } : filter;
+
+  const conds: SQL[] = [];
   const search = q?.trim();
-  const where = search
-    ? or(
+  if (search) {
+    conds.push(
+      or(
         ilike(kwts.name, `%${search}%`),
         ilike(kwts.regency, `%${search}%`),
         ilike(kwts.province, `%${search}%`),
-      )
-    : undefined;
+      )!,
+    );
+  }
+  if (province) conds.push(eq(kwts.province, province));
+  if (regency) conds.push(eq(kwts.regency, regency));
+  const where = conds.length > 0 ? and(...conds) : undefined;
 
   const [groups, productCounts, memberCounts] = await Promise.all([
     db
@@ -56,6 +73,41 @@ export async function getDirectory(q?: string): Promise<DirectoryRow[]> {
     productCount: productMap.get(k.id) ?? 0,
     memberCount: memberMap.get(k.id) ?? 0,
   }));
+}
+
+export interface DirectoryFacets {
+  provinces: Array<{ province: string; kwtCount: number }>;
+  /** Pasangan provinsi+kabupaten/kota yang ada di direktori. */
+  regencies: Array<{ province: string; regency: string; kwtCount: number }>;
+}
+
+/** Facet daerah untuk filter direktori (jumlah KWT per provinsi & kab/kota). */
+export async function getDirectoryFacets(): Promise<DirectoryFacets> {
+  const [provRows, regRows] = await Promise.all([
+    db
+      .select({ province: kwts.province, n: count() })
+      .from(kwts)
+      .where(isNotNull(kwts.province))
+      .groupBy(kwts.province)
+      .orderBy(kwts.province),
+    db
+      .select({ province: kwts.province, regency: kwts.regency, n: count() })
+      .from(kwts)
+      .where(and(isNotNull(kwts.province), isNotNull(kwts.regency)))
+      .groupBy(kwts.province, kwts.regency)
+      .orderBy(kwts.province, kwts.regency),
+  ]);
+
+  return {
+    provinces: provRows.flatMap((r) =>
+      r.province === null ? [] : [{ province: r.province, kwtCount: Number(r.n) }],
+    ),
+    regencies: regRows.flatMap((r) =>
+      r.province === null || r.regency === null
+        ? []
+        : [{ province: r.province, regency: r.regency, kwtCount: Number(r.n) }],
+    ),
+  };
 }
 
 /** Statistik agregat platform (untuk hero direktori). */
