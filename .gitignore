@@ -10,3 +10,9 @@ next-env.d.ts
 drizzle/meta/_journal.json.bak
 *.log
 .neon
+
+.vercel
+.env*
+.vercel/
+.env.local
+.env.vercel-check
