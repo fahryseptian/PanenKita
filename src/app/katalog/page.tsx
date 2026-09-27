@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Leaf, MapPin, Search, Sprout, Users, X } from "lucide-react";
+import { Leaf, Search, Sprout, Users, X } from "lucide-react";
 import {
   getDirectory,
   getDirectoryFacets,
@@ -10,6 +10,7 @@ import {
   categoryLabel,
   parseCategoryParam,
 } from "@/lib/categories";
+import { GroupCard, ProvinceChip } from "./group-card";
 
 export const dynamic = "force-dynamic";
 
@@ -139,26 +140,13 @@ export default async function KatalogIndexPage({
             {facets.provinces.length === 0 && (
               <span className="text-xs text-slate-400">Belum ada data wilayah</span>
             )}
-            {facets.provinces.map((p) => {
-              const active = provinsi === p.province;
-              return (
-                <Link
-                  key={p.province}
-                  href={`/katalog${
-                    active
-                      ? qs({ provinsi: undefined, kabupaten: undefined })
-                      : qs({ provinsi: p.province, kabupaten: undefined })
-                  }`}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                    active
-                      ? "bg-brand-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
-                  }`}
-                >
-                  {p.province} ({p.kwtCount})
-                </Link>
-              );
-            })}
+            {facets.provinces.map((p) => (
+              <ProvinceChip
+                key={p.province}
+                province={p.province}
+                kwtCount={p.kwtCount}
+              />
+            ))}
           </div>
           {provinsi && (
             <div className="flex flex-wrap items-center gap-1.5">
@@ -208,31 +196,7 @@ export default async function KatalogIndexPage({
         ) : (
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {groups.map((k) => (
-              <Link
-                key={k.id}
-                href={`/katalog/${k.slug}`}
-                className="rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-brand-300 hover:shadow-sm"
-              >
-                <h2 className="font-semibold">{k.name}</h2>
-                <p className="mt-1 flex items-center gap-1 text-sm text-slate-500">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                  {[k.regency, k.province].filter(Boolean).join(", ") || "Indonesia"}
-                </p>
-                {k.address && (
-                  <p className="mt-0.5 text-xs text-slate-400">{k.address}</p>
-                )}
-                <div className="mt-3 flex gap-3 text-xs text-slate-500">
-                  <span className="inline-flex items-center gap-1">
-                    <Sprout className="h-3.5 w-3.5 text-brand-500" /> {k.productCount} produk
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5 text-brand-500" /> {k.memberCount} anggota
-                  </span>
-                </div>
-                <p className="mt-3 text-sm font-medium text-brand-600">
-                  Lihat katalog →
-                </p>
-              </Link>
+              <GroupCard key={k.id} group={k} />
             ))}
           </div>
         )}
