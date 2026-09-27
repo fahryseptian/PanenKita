@@ -4,6 +4,7 @@ import { Leaf, Sprout } from "lucide-react";
 import { getCatalog, getKwtBySlug } from "@/lib/queries";
 import { formatRupiah, formatDate } from "@/lib/format";
 import { canonicalCategory, categoryLabel } from "@/lib/categories";
+import { photoSrc } from "@/lib/photo-url";
 import { OrderForm } from "./order-form";
 
 export const dynamic = "force-dynamic";
@@ -156,10 +157,10 @@ function ProductCard({
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex h-32 items-center justify-center bg-brand-50 text-5xl">
-        {item.photoUrl ? (
+        {photoSrc(item.photoUrl) ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={item.photoUrl}
+            src={photoSrc(item.photoUrl)!}
             alt={item.name}
             className="h-full w-full object-cover"
           />

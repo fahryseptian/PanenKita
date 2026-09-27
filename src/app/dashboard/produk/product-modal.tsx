@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { saveProduct } from "@/lib/actions/products";
+import { isStorageKey } from "@/lib/photo-url";
 import {
   PRODUCT_CATEGORIES,
   canonicalCategory,
@@ -24,12 +25,43 @@ export function ProductModal({ product }: { product?: ProductProp }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [photoKey, setPhotoKey] = useState<string | null>(product?.photoUrl ?? null);
+
+  /** Upload file ke bucket via presigned PUT, simpan key ke hidden input. */
+  async function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !product) return; // upload hanya untuk produk yang sudah tersimpan
+    setError(null);
+    setUploading(true);
+    try {
+      const res = await fetch("/api/uploads/photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: product.id, contentType: file.type }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.status);
+      const { uploadUrl, key } = (await res.json()) as { uploadUrl: string; key: string };
+      const put = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!put.ok) throw new Error(`upload-gagal-${put.status}`);
+      setPhotoKey(key);
+    } catch (err) {
+      setError(err instanceof Error ? `Upload gagal: ${err.message}` : "Upload gagal");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
     const fd = new FormData(e.currentTarget);
+    if (photoKey) fd.set("photoUrl", photoKey);
     await saveProduct(fd);
     setSubmitting(false);
     setOpen(false);
@@ -154,16 +186,38 @@ export function ProductModal({ product }: { product?: ProductProp }) {
 
               <div>
                 <label htmlFor="p-photo" className="mb-1 block text-sm font-medium text-slate-700">
-                  URL foto <span className="text-slate-400">(opsional)</span>
+                  Foto produk <span className="text-slate-400">(opsional)</span>
                 </label>
-                <input
-                  id="p-photo"
-                  name="photoUrl"
-                  type="url"
-                  defaultValue={product?.photoUrl ?? ""}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-                  placeholder="https://..."
-                />
+                {product ? (
+                  <>
+                    {photoKey && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={isStorageKey(photoKey) ? `/api/uploads/photo?key=${encodeURIComponent(photoKey)}` : photoKey}
+                        alt="Foto produk"
+                        className="mb-2 h-24 w-24 rounded-lg border border-slate-200 object-cover"
+                      />
+                    )}
+                    <input
+                      id="p-photo"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={onFileSelected}
+                      disabled={uploading}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700"
+                    />
+                    {uploading && <p className="mt-1 text-xs text-slate-400">Mengunggah...</p>}
+                    <input type="hidden" name="photoUrl" value={photoKey ?? ""} />
+                  </>
+                ) : (
+                  <input
+                    id="p-photo"
+                    name="photoUrl"
+                    type="url"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                    placeholder="https://... (simpan produk dulu untuk upload file)"
+                  />
+                )}
               </div>
 
               {error && (
