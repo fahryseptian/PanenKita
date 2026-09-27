@@ -1,6 +1,7 @@
 import { and, count, eq, ilike, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { kwtMembers, kwts, products } from "@/lib/db/schema";
+import { canonicalCategory, type ProductCategory } from "./categories";
 
 export interface DirectoryRow {
   id: string;
@@ -17,13 +18,14 @@ export interface DirectoryFilter {
   q?: string;
   province?: string;
   regency?: string;
+  category?: string;
 }
 
 /** Direktori KWT untuk katalog publik, dengan pencarian & filter daerah. */
 export async function getDirectory(
   filter: string | DirectoryFilter = {},
 ): Promise<DirectoryRow[]> {
-  const { q, province, regency } =
+  const { q, province, regency, category } =
     typeof filter === "string" ? { q: filter } : filter;
 
   const conds: SQL[] = [];
@@ -41,7 +43,7 @@ export async function getDirectory(
   if (regency) conds.push(eq(kwts.regency, regency));
   const where = conds.length > 0 ? and(...conds) : undefined;
 
-  const [groups, productCounts, memberCounts] = await Promise.all([
+  const [groups, productCatRows, memberCounts] = await Promise.all([
     db
       .select({
         id: kwts.id,
@@ -54,21 +56,30 @@ export async function getDirectory(
       .from(kwts)
       .where(where)
       .orderBy(kwts.name),
+    // Kategori produk aktif per KWT — dipetakan ke daftar kanonik di JS agar
+    // kategori legacy teks bebas tetap terhitung (skala data kecil, aman).
     db
-      .select({ kwtId: products.kwtId, n: count() })
+      .select({ kwtId: products.kwtId, category: products.category })
       .from(products)
-      .where(eq(products.isActive, true))
-      .groupBy(products.kwtId),
+      .where(eq(products.isActive, true)),
     db
       .select({ kwtId: kwtMembers.kwtId, n: count() })
       .from(kwtMembers)
       .groupBy(kwtMembers.kwtId),
   ]);
 
-  const productMap = new Map(productCounts.map((r) => [r.kwtId, Number(r.n)]));
+  const productMap = new Map<string, number>();
+  const wanted = category?.trim().toLowerCase();
+  for (const r of productCatRows) {
+    if (wanted && canonicalCategory(r.category) !== wanted) continue;
+    productMap.set(r.kwtId, (productMap.get(r.kwtId) ?? 0) + 1);
+  }
   const memberMap = new Map(memberCounts.map((r) => [r.kwtId, Number(r.n)]));
 
-  return groups.map((k) => ({
+  // Dengan filter kategori, KWT tanpa produk yang cocok disembunyikan.
+  const visible = wanted ? groups.filter((k) => (productMap.get(k.id) ?? 0) > 0) : groups;
+
+  return visible.map((k) => ({
     ...k,
     productCount: productMap.get(k.id) ?? 0,
     memberCount: memberMap.get(k.id) ?? 0,

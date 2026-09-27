@@ -5,6 +5,11 @@ import {
   getDirectoryFacets,
   getPlatformStats,
 } from "@/lib/queries-directory";
+import {
+  PRODUCT_CATEGORIES,
+  categoryLabel,
+  parseCategoryParam,
+} from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -13,20 +18,26 @@ export const metadata = { title: "Katalog" };
 export default async function KatalogIndexPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; provinsi?: string; kabupaten?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    provinsi?: string;
+    kabupaten?: string;
+    kategori?: string;
+  }>;
 }) {
-  const { q, provinsi, kabupaten } = await searchParams;
-  const filter = { q, province: provinsi, regency: kabupaten };
+  const { q, provinsi, kabupaten, kategori: kategoriParam } = await searchParams;
+  const kategori = parseCategoryParam(kategoriParam);
+  const filter = { q, province: provinsi, regency: kabupaten, category: kategori ?? undefined };
   const [groups, facets, stats] = await Promise.all([
     getDirectory(filter),
     getDirectoryFacets(),
     getPlatformStats(),
   ]);
 
-  // Query string helper: mempertahankan q saat toggle chip provinsi/kabupaten.
+  // Query string helper: mempertahankan filter lain saat toggle satu chip.
   const qs = (params: Record<string, string | undefined>) => {
     const sp = new URLSearchParams();
-    const merged = { q, provinsi, kabupaten, ...params };
+    const merged = { q, provinsi, kabupaten, kategori, ...params };
     for (const [k, v] of Object.entries(merged)) if (v) sp.set(k, v);
     const s = sp.toString();
     return s ? `?${s}` : "";
@@ -87,6 +98,7 @@ export default async function KatalogIndexPage({
           </div>
           {provinsi && <input type="hidden" name="provinsi" value={provinsi} />}
           {kabupaten && <input type="hidden" name="kabupaten" value={kabupaten} />}
+          {kategori && <input type="hidden" name="kategori" value={kategori} />}
           <button
             type="submit"
             className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
@@ -97,6 +109,29 @@ export default async function KatalogIndexPage({
 
         {/* Filter daerah */}
         <div className="mt-4 space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Kategori
+            </span>
+            {PRODUCT_CATEGORIES.map((c) => {
+              const active = kategori === c;
+              return (
+                <Link
+                  key={c}
+                  href={`/katalog${
+                    active ? qs({ kategori: undefined }) : qs({ kategori: c })
+                  }`}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                    active
+                      ? "bg-brand-600 text-white"
+                      : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
+                  }`}
+                >
+                  {categoryLabel(c)}
+                </Link>
+              );
+            })}
+          </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
               Provinsi
@@ -152,9 +187,13 @@ export default async function KatalogIndexPage({
               })}
             </div>
           )}
-          {hasRegionFilter && (
+          {(hasRegionFilter || kategori) && (
             <Link
-              href={`/katalog${qs({ provinsi: undefined, kabupaten: undefined })}`}
+              href={`/katalog${qs({
+                provinsi: undefined,
+                kabupaten: undefined,
+                kategori: undefined,
+              })}`}
               className="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-600"
             >
               <X className="h-3 w-3" /> Hapus filter daerah

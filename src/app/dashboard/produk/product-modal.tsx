@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { saveProduct } from "@/lib/actions/products";
+import {
+  PRODUCT_CATEGORIES,
+  canonicalCategory,
+  categoryLabel,
+} from "@/lib/categories";
 
 interface ProductProp {
   id: string;
@@ -79,13 +84,22 @@ export function ProductModal({ product }: { product?: ProductProp }) {
                   <label htmlFor="p-cat" className="mb-1 block text-sm font-medium text-slate-700">
                     Kategori
                   </label>
-                  <input
+                  <select
                     id="p-cat"
                     name="category"
-                    defaultValue={product?.category ?? "sayur"}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-                    placeholder="sayur / rempah / protein"
-                  />
+                    defaultValue={
+                      product && canonicalCategory(product.category) === "lainnya"
+                        ? "lainnya"
+                        : (product?.category ?? "sayur")
+                    }
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                  >
+                    {PRODUCT_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {categoryLabel(c)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="p-unit" className="mb-1 block text-sm font-medium text-slate-700">

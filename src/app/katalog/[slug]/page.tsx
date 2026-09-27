@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Leaf, Sprout } from "lucide-react";
 import { getCatalog, getKwtBySlug } from "@/lib/queries";
 import { formatRupiah, formatDate } from "@/lib/format";
+import { canonicalCategory, categoryLabel } from "@/lib/categories";
 import { OrderForm } from "./order-form";
 
 export const dynamic = "force-dynamic";
@@ -16,13 +18,34 @@ export async function generateMetadata({ params }: Props) {
   return { title: kwt ? `Katalog ${kwt.name}` : "Katalog" };
 }
 
-export default async function CatalogPage({ params }: Props) {
+interface Props {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ kategori?: string }>;
+}
+
+export default async function CatalogPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const { kategori: kategoriParam } = await searchParams;
   const kwt = await getKwtBySlug(slug);
   if (!kwt) notFound();
 
   const items = await getCatalog(kwt.id);
-  const categories = [...new Set(items.map((i) => i.category))];
+  // Kategori kanonik dari produk yang ada, terurut sesuai daftar resmi.
+  const ORDER = [
+    "sayur",
+    "buah",
+    "umbi",
+    "rempah",
+    "protein",
+    "lainnya",
+  ] as const;
+  const categories = [...new Set(items.map((i) => canonicalCategory(i.category)))].sort(
+    (a, b) => ORDER.indexOf(a) - ORDER.indexOf(b),
+  );
+  const active = categories.includes(kategoriParam as never)
+    ? (kategoriParam as string)
+    : null;
+  const shown = active ? items.filter((i) => canonicalCategory(i.category) === active) : items;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -54,20 +77,50 @@ export default async function CatalogPage({ params }: Props) {
           </div>
         ) : (
           <>
-            {categories.map((cat) => (
-              <section key={cat} className="mt-8">
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
-                  {cat}
-                </h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {items
-                    .filter((i) => i.category === cat)
-                    .map((item) => (
-                      <ProductCard key={item.id} item={item} />
-                    ))}
-                </div>
-              </section>
-            ))}
+            {/* Filter kategori */}
+            {categories.length > 1 && (
+              <div className="mt-6 flex flex-wrap items-center gap-1.5">
+                <Link
+                  href={`/katalog/${kwt.slug}`}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                    !active
+                      ? "bg-brand-600 text-white"
+                      : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
+                  }`}
+                >
+                  Semua
+                </Link>
+                {categories.map((c) => (
+                  <Link
+                    key={c}
+                    href={`/katalog/${kwt.slug}?kategori=${c}`}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                      active === c
+                        ? "bg-brand-600 text-white"
+                        : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
+                    }`}
+                  >
+                    {categoryLabel(c)}
+                  </Link>
+                ))}
+              </div>
+            )}
+            {(active ? categories.filter((c) => c === active) : categories).map(
+              (cat) => (
+                <section key={cat} className="mt-8">
+                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
+                    {categoryLabel(cat)}
+                  </h2>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {shown
+                      .filter((i) => canonicalCategory(i.category) === cat)
+                      .map((item) => (
+                        <ProductCard key={item.id} item={item} />
+                      ))}
+                  </div>
+                </section>
+              ),
+            )}
             <section className="mt-10">
               <h2 className="mb-3 text-lg font-bold">Pesan sekarang</h2>
               <OrderForm
