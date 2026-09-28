@@ -79,6 +79,13 @@ export default async function CatalogPage({ params, searchParams }: Props) {
             <p className="text-sm font-bold leading-tight">{kwt.name}</p>
             <p className="text-xs text-slate-500">Katalog panen</p>
           </div>
+          <Link
+            href={`/katalog/${kwt.slug}/sertifikat`}
+            className="ml-auto rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+            title="Lihat sertifikat zero-waste KWT ini"
+          >
+            🌱 Sertifikat Zero-Waste
+          </Link>
         </div>
       </header>
 

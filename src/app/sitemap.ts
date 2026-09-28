@@ -32,10 +32,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: `${base}/katalog/provinsi/${provinceSlug(p.province)}`,
         priority: 0.8,
       })),
-      ...groups.map((g) => ({
-        url: `${base}/katalog/${g.slug}`,
-        priority: 0.7,
-      })),
+      ...groups.flatMap((g) => [
+        {
+          url: `${base}/katalog/${g.slug}`,
+          priority: 0.7,
+        },
+        {
+          url: `${base}/katalog/${g.slug}/sertifikat`,
+          priority: 0.5,
+        },
+      ]),
     ];
   } catch (e) {
     console.warn("[sitemap] database unreachable, emitting static routes only", e);
