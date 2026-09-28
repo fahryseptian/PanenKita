@@ -12,6 +12,7 @@ import {
   getHarvests,
   getOrders,
 } from "@/lib/queries";
+import { getHarvestForecast } from "@/lib/queries-forecast";
 import { formatRupiah, formatDateTime, formatQuantity, timeAgo } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -20,11 +21,13 @@ export const metadata = { title: "Ringkasan" };
 
 export default async function DashboardPage() {
   const ctx = await requireKwtContext();
-  const [overview, recentHarvests, recentOrders] = await Promise.all([
+  const [overview, recentHarvests, recentOrders, forecast] = await Promise.all([
     getDashboardOverview(ctx.kwtId),
     getHarvests(ctx.kwtId, { limit: 5 }),
     getOrders(ctx.kwtId, { limit: 5 }),
+    getHarvestForecast(ctx.kwtId),
   ]);
+  const forecastVisible = ctx.isAdmin ? forecast : forecast.filter((f) => f.trend !== "belum-cukup-data");
 
   const metrics = [
     { label: "Produk aktif", value: String(overview.productCount), icon: TrendingUp, href: "/dashboard/produk" },
@@ -61,6 +64,67 @@ export default async function DashboardPage() {
           <p className="text-sm text-brand-700">
             Total pembayaran diterima:{" "}
             <span className="text-xl font-bold">{formatRupiah(overview.paidRevenue)}</span>
+          </p>
+        </section>
+      )}
+
+      {/* Prediksi panen (baseline statistik) */}
+      {forecastVisible.length > 0 && (
+        <section className="rounded-2xl border border-slate-200 bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-4">
+            <div>
+              <h2 className="font-semibold">📈 Prediksi panen minggu depan</h2>
+              <p className="text-xs text-slate-500">
+                Rata-rata bergerak 4 minggu terakhir per produk — angka kasar untuk
+                merencanakan tanam & stok, bukan jaminan.
+              </p>
+            </div>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {forecastVisible.map((f) => (
+              <div
+                key={f.productId}
+                className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm"
+              >
+                <div>
+                  <p className="font-medium">
+                    {f.forecastKg > 0 ? formatQuantity(f.forecastKg) : "0"} {f.unit}
+                    <span className="ml-1 text-xs font-normal text-slate-400">/ minggu (est.)</span>
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    4 minggu terakhir: {formatQuantity(f.last4TotalKg)} {f.unit} ·{" "}
+                    {f.activeWeeks}/4 minggu aktif
+                    {ctx.isAdmin &&
+                      f.productId &&
+                      ` · data terbatas, tambah panen untuk akurasi`}
+                  </p>
+                </div>
+                {f.trend === "naik" && (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                    ↗ naik {f.trendPercent}%
+                  </span>
+                )}
+                {f.trend === "turun" && (
+                  <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600">
+                    ↘ turun {Math.abs(f.trendPercent)}%
+                  </span>
+                )}
+                {f.trend === "stabil" && (
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
+                    → stabil
+                  </span>
+                )}
+                {f.trend === "belum-cukup-data" && (
+                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                    data belum cukup
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="px-5 py-3 text-[10px] text-slate-400">
+            Basis: panen 28 hari terakhir. Tren = 2 minggu terakhir vs 2 minggu
+            sebelumnya (ambang ±15%). Makin rajin mencatat panen, makin akurat.
           </p>
         </section>
       )}
