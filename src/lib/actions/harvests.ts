@@ -27,12 +27,15 @@ export async function recordHarvest(formData: FormData): Promise<void> {
 
   // Limbah tidak boleh melebihi total panen.
   const waste = Math.min(input.wasteQty, input.quantity);
+  // Jalur ESG hanya relevan bila ada limbah; default hilang (konservatif).
+  const destination = waste > 0 ? input.wasteDestination : "hilang";
 
   await db.insert(harvests).values({
     productId: product.id,
     memberId: ctx.userId,
     quantity: String(input.quantity),
     wasteQty: String(waste),
+    wasteDestination: destination,
     quality: input.quality,
     note: input.note || null,
   });
@@ -72,13 +75,20 @@ export async function recordHarvest(formData: FormData): Promise<void> {
 
 /**
  * Admin mencatat susut/limbah pada panen yang sudah ada (mis. sebagian busuk
- * saat penyimpanan). Limbah mengurangi stok jual & masuk perhitungan ESG.
+ * saat penyimpanan) beserta jalur ESG-nya (donasi/kompos/hilang). Limbah
+ * mengurangi stok jual & masuk perhitungan ESG sesuai jalur.
  */
 export async function updateHarvestWaste(formData: FormData): Promise<void> {
   const ctx = await requireKwtContext();
   if (!ctx.isAdmin) return;
   const id = String(formData.get("id") ?? "");
   const waste = Number(formData.get("wasteQty") ?? 0);
+  const destRaw = String(formData.get("wasteDestination") ?? "hilang");
+  const destination = (["donasi", "kompos", "hilang"] as const).includes(
+    destRaw as "donasi" | "kompos" | "hilang",
+  )
+    ? (destRaw as "donasi" | "kompos" | "hilang")
+    : "hilang";
   if (!id || !Number.isFinite(waste) || waste < 0) return;
 
   const [row] = await db
@@ -91,7 +101,10 @@ export async function updateHarvestWaste(formData: FormData): Promise<void> {
 
   await db
     .update(harvests)
-    .set({ wasteQty: String(Math.min(waste, Number(row.quantity))) })
+    .set({
+      wasteQty: String(Math.min(waste, Number(row.quantity))),
+      wasteDestination: waste > 0 ? destination : "hilang",
+    })
     .where(eq(harvests.id, id));
   await recomputeProductPrice(row.productId);
   revalidatePath("/dashboard/panen");

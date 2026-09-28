@@ -90,8 +90,23 @@ export function HarvestForm({ products }: Props) {
             placeholder="0"
           />
           <p className="mt-1 text-xs text-slate-400">
-            Tidak masuk stok jual, tapi dihitung sebagai emisi terhindar di laporan.
+            Tidak masuk stok jual — pilih jalurnya untuk laporan ESG.
           </p>
+        </div>
+        <div>
+          <label htmlFor="wasteDestination" className="mb-1 block text-sm font-medium text-slate-700">
+            Jalur ESG
+          </label>
+          <select
+            id="wasteDestination"
+            name="wasteDestination"
+            defaultValue="donasi"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+          >
+            <option value="donasi">🤝 Didonasikan (bank pangan)</option>
+            <option value="kompos">♻️ Dikomposkan</option>
+            <option value="hilang">🗑️ Hilang / busuk</option>
+          </select>
         </div>
         <div>
           <label htmlFor="quality" className="mb-1 block text-sm font-medium text-slate-700">

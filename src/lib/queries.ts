@@ -181,6 +181,7 @@ export interface HarvestRow {
   memberId: string;
   quantity: number;
   wasteQty: number;
+  wasteDestination: string;
   quality: string;
   note: string | null;
   harvestedAt: Date;
@@ -200,6 +201,7 @@ export async function getHarvests(
       memberId: harvests.memberId,
       quantity: harvests.quantity,
       wasteQty: harvests.wasteQty,
+      wasteDestination: harvests.wasteDestination,
       quality: harvests.quality,
       note: harvests.note,
       harvestedAt: harvests.harvestedAt,

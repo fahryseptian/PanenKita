@@ -127,18 +127,45 @@ export default async function LaporanPage({
         </Link>
       </div>
 
-      {/* Zero-waste / ESG */}
+      {/* Zero-waste / ESG — tiga jalur */}
       {laporan.wasteKg > 0 && (
         <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
           <h2 className="text-sm font-semibold text-emerald-800">
-            🌱 Emisi karbon terhindar (zero-waste)
+            🌱 Dampak zero-waste — tiga jalur
           </h2>
-          <p className="mt-1 text-sm text-emerald-700">
-            {formatQuantity(laporan.wasteKg)} kg hasil panen yang tadinya berisiko
-            terbuang tersalurkan sebagai stok katalog — setara mencegah{" "}
-            <strong>{formatCo2(laporan.co2ePrevented)}</strong> (≈{" "}
-            {carKmEquivalent(laporan.co2ePrevented).toLocaleString("id-ID")} km
-            berkendara mobil).
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-xl bg-white p-3">
+              <p className="text-xs font-medium text-slate-500">✅ Tersalurkan (terjual)</p>
+              <p className="text-sm font-bold tabular-nums text-emerald-700">
+                {formatQuantity(laporan.perProduk.reduce((a, p) => a + p.qtySold, 0))} kg
+              </p>
+              <p className="text-[10px] text-slate-400">2,5 kg CO₂e/kg</p>
+            </div>
+            <div className="rounded-xl bg-white p-3">
+              <p className="text-xs font-medium text-slate-500">🤝 Didonasikan</p>
+              <p className="text-sm font-bold tabular-nums text-emerald-700">
+                {formatQuantity(laporan.pathways.donasi)} kg
+              </p>
+              <p className="text-[10px] text-slate-400">2,5 kg CO₂e/kg</p>
+            </div>
+            <div className="rounded-xl bg-white p-3">
+              <p className="text-xs font-medium text-slate-500">♻️ Dikomposkan</p>
+              <p className="text-sm font-bold tabular-nums text-emerald-700">
+                {formatQuantity(laporan.pathways.kompos)} kg
+              </p>
+              <p className="text-[10px] text-slate-400">0,5 kg CO₂e/kg</p>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-emerald-700">
+            Total emisi terhindar <strong>{formatCo2(laporan.co2ePrevented)}</strong> (≈{" "}
+            {carKmEquivalent(laporan.co2ePrevented).toLocaleString("id-ID")} km berkendara
+            mobil).
+            {laporan.pathways.hilang > 0 && (
+              <>
+                {" "}Perhatian: {formatQuantity(laporan.pathways.hilang)} kg limbah belum
+                tertangani (potensi {formatCo2(laporan.co2eHilangRisk)} jika berakhir di TPA).
+              </>
+            )}
           </p>
         </section>
       )}

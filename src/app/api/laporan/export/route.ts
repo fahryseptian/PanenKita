@@ -69,8 +69,14 @@ export async function GET(req: Request) {
       anggotaRows,
     ),
     toCsv(
-      ["Emisi Karbon Terhindar (zero-waste)"],
-      [[`Limbah dicegah: ${laporan.wasteKg} kg`], [`CO2e terhindar: ${laporan.co2ePrevented} kg`]],
+      ["Zero-Waste / ESG (Tiga Jalur)", "Kg", "Faktor CO2e/kg", "CO2e Terhindar (kg)"],
+      [
+        ["1. Tersalurkan (terjual)", laporan.perProduk.reduce((a, p) => a + p.qtySold, 0), 2.5, laporan.pathways.salur * 2.5],
+        ["2. Didonasikan", laporan.pathways.donasi, 2.5, laporan.pathways.donasi * 2.5],
+        ["3. Dikomposkan", laporan.pathways.kompos, 0.5, laporan.pathways.kompos * 0.5],
+        ["(Belum tertangani - hilang)", laporan.pathways.hilang, "", ""],
+        ["TOTAL CO2e terhindar", "", "", laporan.co2ePrevented],
+      ],
     ),
   ].join("");
 

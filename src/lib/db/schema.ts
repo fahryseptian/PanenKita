@@ -23,6 +23,12 @@ export const memberRoleEnum = pgEnum("member_role", [
   "anggota",
 ]);
 export const qualityGradeEnum = pgEnum("quality_grade", ["A", "B", "C"]);
+/** Tujuan bagian panen yang tidak terjual: donasi / kompos / hilang. */
+export const wasteDestinationEnum = pgEnum("waste_destination", [
+  "donasi",
+  "kompos",
+  "hilang",
+]);
 export const orderStatusEnum = pgEnum("order_status", [
   "pending",
   "paid",
@@ -210,6 +216,13 @@ export const harvests = pgTable(
     wasteQty: numeric("waste_qty", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
+    /**
+     * Jalur ESG untuk bagian tak terjual: didonasikan (bank pangan),
+     * dikomposkan, atau hilang (default lama — dianggap busuk tak tertangani).
+     */
+    wasteDestination: wasteDestinationEnum("waste_destination")
+      .notNull()
+      .default("hilang"),
     harvestedAt: timestamp("harvested_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

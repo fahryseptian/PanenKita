@@ -48,21 +48,51 @@ export default async function CetakLaporanPage({
 
       {/* Dampak lingkungan */}
       <section className="mt-5">
-        <h2 className="mb-2 text-sm font-bold uppercase">Dampak Lingkungan (Zero-Waste)</h2>
+        <h2 className="mb-2 text-sm font-bold uppercase">Dampak Lingkungan (Zero-Waste — Tiga Jalur)</h2>
         <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border border-slate-300 bg-slate-50">
+              <th className="border border-slate-300 px-3 py-1.5 text-left">Jalur</th>
+              <th className="border border-slate-300 px-3 py-1.5 text-right">Kuantitas</th>
+              <th className="border border-slate-300 px-3 py-1.5 text-right">Faktor</th>
+              <th className="border border-slate-300 px-3 py-1.5 text-right">CO₂e Terhindar</th>
+            </tr>
+          </thead>
           <tbody>
             <tr className="border border-slate-300">
-              <td className="border border-slate-300 px-3 py-1.5">Hasil panen tersalurkan (tidak terbuang)</td>
+              <td className="border border-slate-300 px-3 py-1.5">1. Tersalurkan — dijual via katalog</td>
               <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums">
-                {formatQuantity(Math.max(0, laporan.perProduk.reduce((a, p) => a + p.qtyHarvested - p.qtyWaste, 0)))} kg
+                {formatQuantity(laporan.perProduk.reduce((a, p) => a + p.qtySold, 0))} kg
+              </td>
+              <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums">2,5</td>
+              <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums">
+                {formatCo2(laporan.co2ePrevented === 0 ? 0 : laporan.pathways.salur * 2.5)}
               </td>
             </tr>
             <tr className="border border-slate-300">
-              <td className="border border-slate-300 px-3 py-1.5">Limbah pangan tercatat</td>
-              <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums">{formatQuantity(wasteKg)} kg</td>
+              <td className="border border-slate-300 px-3 py-1.5">2. Didonasikan (bank pangan)</td>
+              <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums">{formatQuantity(laporan.pathways.donasi)} kg</td>
+              <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums">2,5</td>
+              <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums">{formatCo2(laporan.pathways.donasi * 2.5)}</td>
             </tr>
+            <tr className="border border-slate-300">
+              <td className="border border-slate-300 px-3 py-1.5">3. Dikomposkan (aerobik)</td>
+              <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums">{formatQuantity(laporan.pathways.kompos)} kg</td>
+              <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums">0,5</td>
+              <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums">{formatCo2(laporan.pathways.kompos * 0.5)}</td>
+            </tr>
+            {laporan.pathways.hilang > 0 && (
+              <tr className="border border-slate-300">
+                <td className="border border-slate-300 px-3 py-1.5 text-slate-500">(Belum tertangani — hilang)</td>
+                <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums text-slate-500">{formatQuantity(laporan.pathways.hilang)} kg</td>
+                <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums text-slate-500">—</td>
+                <td className="border border-slate-300 px-3 py-1.5 text-right tabular-nums text-slate-500">risiko {formatCo2(laporan.co2eHilangRisk)}</td>
+              </tr>
+            )}
             <tr className="border border-slate-300 bg-slate-50">
-              <td className="border border-slate-300 px-3 py-1.5 font-semibold">Emisi terhindar (pencegahan food waste)</td>
+              <td className="border border-slate-300 px-3 py-1.5 font-semibold">Total emisi terhindar</td>
+              <td className="border border-slate-300 px-3 py-1.5" />
+              <td className="border border-slate-300 px-3 py-1.5" />
               <td className="border border-slate-300 px-3 py-1.5 text-right font-semibold tabular-nums">
                 {formatCo2(co2e)} (≈ {carKmEquivalent(co2e).toLocaleString("id-ID")} km mobil)
               </td>
@@ -70,7 +100,7 @@ export default async function CetakLaporanPage({
           </tbody>
         </table>
         <p className="mt-1 text-[10px] text-slate-500">
-          Faktor emisi 2,5 kg CO₂e per kg limbah pangan terhindar (dekomposisi anaerobik TPA, estimasi konservatif).
+          Faktor emisi (kg CO₂e per kg, estimasi konservatif dekomposisi anaerobik TPA): pangan dikonsumsi/didonasi 2,5; komposting aerobik 0,5.
         </p>
       </section>
 

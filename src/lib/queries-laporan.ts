@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { harvests, orders, orderItems, products, user } from "@/lib/db/schema";
-import { co2ePreventedKg } from "./carbon";
+import { co2eFromPathways, type PathwayBreakdown } from "./carbon";
 import { getKwtFeeSummary } from "./fees-db";
 
 /**
@@ -21,9 +21,12 @@ export interface LaporanPeriode {
   cancelledCount: number;
   pendingCount: number;
   avgOrder: number | null;
-  // Zero-waste / ESG: limbah satuan kg (dapat dikonversi ke emisi)
+  // Zero-waste / ESG tiga jalur: tersalurkan (terjual), didonasikan, dikomposkan.
+  // `hilang` (llegacy) dihitung terpisah dan TIDAK dihitung sebagai emisi terhindar.
   wasteKg: number;
   co2ePrevented: number;
+  pathways: PathwayBreakdown & { hilang: number };
+  co2eHilangRisk: number;
   // Komisi platform pada pesanan terbayar periode ini
   feeCount: number;
   platformFee: number;
@@ -103,13 +106,16 @@ export async function getLaporanPeriode(
         .groupBy(products.id, products.name, products.unit)
     : [];
 
-  // ---- Per produk: panen pada periode yang sama (termasuk limbah) ----
+  // ---- Per produk: panen pada periode yang sama (termasuk limbah per jalur) ----
   const harvestRows = await db
     .select({
       productId: products.id,
       qty: sql<string>`sum(${harvests.quantity})`,
       waste: sql<string>`sum(${harvests.wasteQty})`,
       unit: products.unit,
+      wasteDonasi: sql<string>`sum(case when ${harvests.wasteDestination} = 'donasi' then ${harvests.wasteQty} else 0 end)`,
+      wasteKompos: sql<string>`sum(case when ${harvests.wasteDestination} = 'kompos' then ${harvests.wasteQty} else 0 end)`,
+      wasteHilang: sql<string>`sum(case when ${harvests.wasteDestination} = 'hilang' then ${harvests.wasteQty} else 0 end)`,
     })
     .from(harvests)
     .innerJoin(products, eq(harvests.productId, products.id))
@@ -136,11 +142,22 @@ export async function getLaporanPeriode(
     });
   }
   let wasteKg = 0;
+  const pathways: PathwayBreakdown & { hilang: number } = {
+    salur: 0,
+    donasi: 0,
+    kompos: 0,
+    hilang: 0,
+  };
   for (const h of harvestRows) {
     const existing = productMap.get(h.productId);
     const qtyHarvested = Number(h.qty);
     const qtyWaste = Number(h.waste);
-    if (h.unit === "kg") wasteKg += qtyWaste;
+    if (h.unit === "kg") {
+      wasteKg += qtyWaste;
+      pathways.donasi += Number(h.wasteDonasi);
+      pathways.kompos += Number(h.wasteKompos);
+      pathways.hilang += Number(h.wasteHilang);
+    }
     if (existing) {
       existing.qtyHarvested = qtyHarvested;
       existing.qtyWaste = qtyWaste;
@@ -162,6 +179,9 @@ export async function getLaporanPeriode(
     }
   }
   wasteKg = Math.round(wasteKg * 100) / 100;
+  for (const k of ["salur", "donasi", "kompos", "hilang"] as const) {
+    pathways[k] = Math.round(pathways[k] * 100) / 100;
+  }
   const perProduk = [...productMap.values()].sort((a, b) => b.revenue - a.revenue || b.qtyHarvested - a.qtyHarvested);
 
   // ---- Per anggota: kontribusi panen ----
@@ -203,7 +223,14 @@ export async function getLaporanPeriode(
     pendingCount,
     avgOrder: paidCount > 0 ? Math.round(totalPaid / paidCount) : null,
     wasteKg,
-    co2ePrevented: co2ePreventedKg(wasteKg),
+    co2ePrevented: co2eFromPathways({
+      salur: pathways.salur,
+      donasi: pathways.donasi,
+      kompos: pathways.kompos,
+    }),
+    pathways,
+    // Potensi emisi dari limbah yang belum tertangani (bukan pencapaian).
+    co2eHilangRisk: Math.round(pathways.hilang * 2.5 * 100) / 100,
     feeCount: feeSummary.feeCount,
     platformFee: feeSummary.totalFee,
     netToKwt: feeSummary.netTotal,

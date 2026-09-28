@@ -58,7 +58,15 @@ export default async function HarvestPage() {
                 </p>
                 <p className="text-xs text-slate-400">
                   {h.memberName} · {timeAgo(h.harvestedAt)}
-                  {h.wasteQty > 0 ? ` · busuk ${formatQuantity(h.wasteQty)} ${h.unit}` : ""}
+                  {h.wasteQty > 0
+                    ? ` · tak terjual ${formatQuantity(h.wasteQty)} ${h.unit} (${
+                        h.wasteDestination === "donasi"
+                          ? "🤝 donasi"
+                          : h.wasteDestination === "kompos"
+                            ? "♻️ kompos"
+                            : "🗑️ hilang"
+                      })`
+                    : ""}
                   {h.note ? ` · ${h.note}` : ""}
                 </p>
               </div>
@@ -77,9 +85,19 @@ export default async function HarvestPage() {
                       max={h.quantity}
                       defaultValue={h.wasteQty > 0 ? h.wasteQty : undefined}
                       title="Catat susut/busuk (tidak masuk stok jual)"
-                      placeholder="busuk"
-                      className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500"
+                      placeholder="qty"
+                      className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-xs outline-none focus:border-brand-500"
                     />
+                    <select
+                      name="wasteDestination"
+                      defaultValue={h.wasteDestination}
+                      title="Jalur ESG"
+                      className="rounded-lg border border-slate-200 bg-white px-1 py-1 text-xs outline-none focus:border-brand-500"
+                    >
+                      <option value="donasi">🤝</option>
+                      <option value="kompos">♻️</option>
+                      <option value="hilang">🗑️</option>
+                    </select>
                     <button
                       type="submit"
                       title="Simpan limbah"
