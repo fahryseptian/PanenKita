@@ -24,7 +24,20 @@ export const productInputSchema = z.object({
     .default("sayur"),
   unit: z.enum(["kg", "ikat", "buah", "pack"]).default("kg"),
   description: z.string().trim().max(500).optional(),
-  photoUrl: z.url("URL foto tidak valid").max(2048).optional().or(z.literal("")),
+  /** URL http(s) eksternal, atau key bucket storage (products/<uuid>.<ext>). */
+  photoUrl: z
+    .string()
+    .trim()
+    .max(2048)
+    .refine(
+      (v) =>
+        v === "" ||
+        /^https?:\/\//i.test(v) ||
+        /^products\/[A-Za-z0-9-]+\.(jpg|jpeg|png|webp)$/.test(v),
+      "URL foto tidak valid",
+    )
+    .optional()
+    .or(z.literal("")),
   basePrice: z.coerce
     .number()
     .int("Harga harus bilangan bulat")

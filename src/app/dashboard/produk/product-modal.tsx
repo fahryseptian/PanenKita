@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { saveProduct } from "@/lib/actions/products";
 import { isStorageKey } from "@/lib/photo-url";
+import { processImage, formatBytes } from "@/lib/image-client";
 import {
   PRODUCT_CATEGORIES,
   canonicalCategory,
@@ -26,29 +27,36 @@ export function ProductModal({ product }: { product?: ProductProp }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [compressionNote, setCompressionNote] = useState<string | null>(null);
   const [photoKey, setPhotoKey] = useState<string | null>(product?.photoUrl ?? null);
 
-  /** Upload file ke bucket via presigned PUT, simpan key ke hidden input. */
+  /** Kompres/resize lalu upload ke bucket via presigned PUT. */
   async function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !product) return; // upload hanya untuk produk yang sudah tersimpan
     setError(null);
     setUploading(true);
     try {
+      const img = await processImage(file);
       const res = await fetch("/api/uploads/photo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: product.id, contentType: file.type }),
+        body: JSON.stringify({ productId: product.id, contentType: img.contentType }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.status);
       const { uploadUrl, key } = (await res.json()) as { uploadUrl: string; key: string };
       const put = await fetch(uploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
+        headers: { "Content-Type": img.contentType },
+        body: img.blob,
       });
       if (!put.ok) throw new Error(`upload-gagal-${put.status}`);
       setPhotoKey(key);
+      setCompressionNote(
+        img.processedBytes < img.originalBytes
+          ? `Dioptimalkan: ${formatBytes(img.originalBytes)} → ${formatBytes(img.processedBytes)}${img.resized ? " (di-resize 1200px)" : ""}`
+          : null,
+      );
     } catch (err) {
       setError(err instanceof Error ? `Upload gagal: ${err.message}` : "Upload gagal");
     } finally {
@@ -206,7 +214,10 @@ export function ProductModal({ product }: { product?: ProductProp }) {
                       disabled={uploading}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700"
                     />
-                    {uploading && <p className="mt-1 text-xs text-slate-400">Mengunggah...</p>}
+                    {uploading && <p className="mt-1 text-xs text-slate-400">Mengompres & mengunggah...</p>}
+                    {compressionNote && (
+                      <p className="mt-1 text-xs text-emerald-600">✓ {compressionNote}</p>
+                    )}
                     <input type="hidden" name="photoUrl" value={photoKey ?? ""} />
                   </>
                 ) : (
