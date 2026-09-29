@@ -201,6 +201,8 @@ export const kwts = pgTable(
     province: text("province"),
     /** Kode wilayah kab/kota (apiindonesia.id) — opsional, dari dropdown resmi */
     regionCode: text("region_code"),
+    /** Kode desa adm4 untuk cuaca BMKG — di-cache otomatis dari nama kab/kota */
+    weatherAdm4: text("weather_adm4"),
     inviteCode: text("invite_code"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

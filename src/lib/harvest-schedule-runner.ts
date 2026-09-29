@@ -10,7 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { recomputeProductPrice } from "@/lib/pricing-db";
 import { sendWa, scheduledHarvestMessage } from "@/lib/wa";
-import { fetchHolidays, fetchWeather, isBadWeather } from "@/lib/api-indonesia";
+import { fetchHolidays, fetchWeather, isBadWeather, searchAdm4 } from "@/lib/api-indonesia";
 
 export interface ScheduleRunResult {
   executed: number;
@@ -167,16 +167,32 @@ export interface WeatherNote {
 async function weatherWarningForKwt(kwtId: string): Promise<WeatherNote | null> {
   try {
     const [kwt] = await db
-      .select({ regionCode: kwts.regionCode })
+      .select({
+        regionCode: kwts.regionCode,
+        weatherAdm4: kwts.weatherAdm4,
+        regency: kwts.regency,
+      })
       .from(kwts)
       .where(eq(kwts.id, kwtId))
       .limit(1);
-    if (!kwt?.regionCode) return null; // wilayah belum diisi via dropdown resmi
 
-    const rows = await fetchWeather(kwt.regionCode);
+    // Resolusi adm4 (sekali per KWT, lalu di-cache): dari kode kab/kota -> nama -> search.
+    let adm4 = kwt?.weatherAdm4 ?? null;
+    if (!adm4 && kwt?.regionCode && kwt.regency) {
+      const hits = await searchAdm4(kwt.regency);
+      adm4 = hits[0]?.adm4 ?? null;
+      if (adm4) {
+        await db.update(kwts).set({ weatherAdm4: adm4 }).where(eq(kwts.id, kwtId));
+      }
+    }
+    if (!adm4) return null; // wilayah belum diisi atau nama tidak ditemukan
+
+    const rows = await fetchWeather(adm4);
     if (rows.length === 0) return null;
     const next = rows[0]!;
-    return { severe: isBadWeather(next.weather_desc), desc: next.weather_desc };
+    const desc = next.weather ?? next.weather_desc ?? "";
+    if (!desc) return null;
+    return { severe: isBadWeather(desc), desc };
   } catch (err) {
     console.error("[harvest-schedule] weather check failed", err);
     return null;

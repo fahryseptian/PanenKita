@@ -69,18 +69,23 @@ export async function fetchRegencies(provinceId: string): Promise<ApiRegency[]> 
 }
 
 export interface ApiWeatherRow {
-  kotkab: string;
-  datetime: string;
-  weather_desc: string;
-  temperature_c: number;
-  humidity_percent: number;
-  wind_speed: number;
+  adm4?: string;
+  kotkab?: string;
+  weather?: string;
+  weather_desc?: string;
+  temperature_c?: number;
+  humidity_percent?: number;
+  wind_speed?: number;
 }
 
-/** Prakiraan cuaca per kabupaten/kota (BMKG, cache 6 jam di sisi API). */
-export async function fetchWeather(regencyId: string): Promise<ApiWeatherRow[]> {
+/**
+ * Prakiraan cuaca per desa (adm4, BMKG, cache 6 jam di sisi API).
+ * adm4 = kode desa bertitik, mis. 12.07.09.2003 — didapat dari /cuaca/search.
+ * (Endpoint ?kabupaten_id= ternyata tidak dipakai — API selalu NOT_FOUND.)
+ */
+export async function fetchWeather(adm4: string): Promise<ApiWeatherRow[]> {
   const data = await apiGet<ApiWeatherRow[]>(
-    `/cuaca?kabupaten_id=${encodeURIComponent(regencyId)}`,
+    `/cuaca?adm4=${encodeURIComponent(adm4)}`,
   );
   return data ?? [];
 }
@@ -93,6 +98,19 @@ export interface ApiHoliday {
 /** Hari libur nasional + cuti bersama per tahun (SKB 3 Menteri). */
 export async function fetchHolidays(year: number): Promise<ApiHoliday[]> {
   const data = await apiGet<ApiHoliday[]>(`/libur?year=${year}`);
+  return data ?? [];
+}
+
+export interface Adm4Hit {
+  adm4: string;
+  kotkab: string;
+}
+
+/** Cari kode desa (adm4) dari nama kab/kota — dipakai sekali per KWT lalu di-cache. */
+export async function searchAdm4(kabupatenName: string): Promise<Adm4Hit[]> {
+  const data = await apiGet<Adm4Hit[]>(
+    `/cuaca/search?q=${encodeURIComponent(kabupatenName)}`,
+  );
   return data ?? [];
 }
 
