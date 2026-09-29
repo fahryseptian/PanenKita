@@ -1,9 +1,11 @@
 import Link from "next/link";
 import {
+  AlertTriangle,
   BadgeCheck,
   Clock,
   Download,
   HandCoins,
+  RefreshCw,
   Store,
   Users,
 } from "lucide-react";
@@ -11,6 +13,8 @@ import {
   getAdminOverview,
   listRecentOrders,
 } from "@/lib/admin-queries";
+import { getFeeLedgerHealth } from "@/lib/fees-db";
+import { syncFeeLedger } from "@/lib/actions/superadmin";
 import { formatRupiah, formatDateTime } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -24,10 +28,16 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   expired: { label: "Kedaluwarsa", cls: "bg-slate-100 text-slate-400" },
 };
 
-export default async function AdminOverviewPage() {
-  const [overview, recentOrders] = await Promise.all([
+export default async function AdminOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sukses?: string; n?: string }>;
+}) {
+  const { sukses, n } = await searchParams;
+  const [overview, recentOrders, feeHealth] = await Promise.all([
     getAdminOverview(),
     listRecentOrders(10),
+    getFeeLedgerHealth(5),
   ]);
 
   const metrics = [
@@ -74,6 +84,43 @@ export default async function AdminOverviewPage() {
           <Clock className="mr-2 inline h-4 w-4" />
           {overview.kwtPending} kelompok menunggu persetujuan →
         </Link>
+      )}
+
+      {sukses === "fee-backfill" && (
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          ✅ Ledger fee disinkronkan — {n ?? 0} catatan fee dilengkapi.
+        </p>
+      )}
+
+      {feeHealth.driftCount > 0 && (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+            <AlertTriangle className="h-4 w-4" />
+            {feeHealth.driftCount} pesanan terbayar tanpa catatan fee
+          </h2>
+          <p className="mt-1 text-xs text-amber-800">
+            Pendapatan platform pada pesanan ini belum tercatat di ledger.
+            Sinkronkan untuk melengkapinya — aksi ini idempoten dan aman
+            diulang.
+          </p>
+          <ul className="mt-2 space-y-0.5 text-xs text-amber-800">
+            {feeHealth.samples.map((s) => (
+              <li key={s.orderId} className="font-mono">
+                {s.orderNumber} · {s.kwtName} · {formatRupiah(s.total)}
+              </li>
+            ))}
+            {feeHealth.truncated && <li>…dan lainnya</li>}
+          </ul>
+          <form action={syncFeeLedger} className="mt-3">
+            <button
+              type="submit"
+              className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Sinkronkan ledger fee
+            </button>
+          </form>
+        </section>
       )}
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">

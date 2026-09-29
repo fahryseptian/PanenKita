@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
 import { mapTransactionStatus, verifySignature } from "@/lib/midtrans";
 import { sendWa, orderPaidMessage } from "@/lib/wa";
-import { recordPlatformFee } from "@/lib/fees-db";
+import { recordPlatformFee, reversePlatformFee } from "@/lib/fees-db";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +47,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
-  // Idempoten: jangan proses ulang transaksi final (expired masih bisa dibayar
-  // jika Snap token lama diselesaikan — pembayaran nyata tetap dihormati).
-  if (["paid", "completed", "cancelled"].includes(order.status)) {
+  // Pesanan yang sudah terbayar (uang masuk, fee tercatat).
+  const wasPaid = ["paid", "processing", "completed"].includes(order.status);
+
+  // Idempoten: transaksi final tidak diproses ulang. Pengecualian: refund/batal
+  // (status "cancelled") atas pesanan yang sudah terbayar harus tetap diproses
+  // supaya fee platformnya ikut dibalikkan.
+  if (order.status === "cancelled" || (wasPaid && status !== "cancelled")) {
     return NextResponse.json({ ok: true, idempotent: true });
   }
 
@@ -74,6 +78,11 @@ export async function POST(req: Request) {
       .update(orders)
       .set({ status: "cancelled" })
       .where(eq(orders.id, order.id));
+    if (wasPaid) {
+      await reversePlatformFee(order.id, {
+        reason: "Refund/pembatalan dari Midtrans",
+      });
+    }
   }
 
   return NextResponse.json({ ok: true });

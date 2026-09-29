@@ -217,6 +217,10 @@ export const kwts = pgTable(
     regionCode: text("region_code"),
     /** Kode desa adm4 untuk cuaca BMKG — di-cache otomatis dari nama kab/kota */
     weatherAdm4: text("weather_adm4"),
+    /** Rekening pencairan fee (diisi superadmin; dipakai disbursement otomatis) */
+    bankName: text("bank_name"),
+    bankAccountNumber: text("bank_account_number"),
+    bankAccountHolder: text("bank_account_holder"),
     /**
      * Moderasi: KWT baru = "pending" (belum tampil di katalog publik).
      * Superadmin menyetujui ("approved") atau menolak ("rejected") via /admin.
@@ -418,6 +422,15 @@ export const platformFees = pgTable(
     handlingFee: integer("handling_fee").notNull(),
     totalFee: integer("total_fee").notNull(),
     netToKwt: integer("net_to_kwt").notNull(),
+    /**
+     * Pembalikan fee (refund/pembatalan pesanan terbayar). Baris TIDAK dihapus
+     * agar audit tetap lengkap — semua perhitungan fee mengabaikan baris ini.
+     */
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    reversedReason: text("reversed_reason"),
+    reversedBy: text("reversed_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -506,6 +519,10 @@ export const kwtSettlements = pgTable(
     settledThrough: timestamp("settled_through", { withTimezone: true }).notNull(),
     /** Jumlah pesanan yang fee-nya termasuk dalam pencairan ini */
     feeCount: integer("fee_count").notNull().default(0),
+    /** transfer | tunai | otomatis (disbursement API) */
+    method: text("method").notNull().default("transfer"),
+    /** Nomor referensi transfer / payout id dari penyedia disbursement */
+    reference: text("reference"),
     note: text("note"),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true })

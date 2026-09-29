@@ -3,7 +3,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, count, eq, gt, sql } from "drizzle-orm";
+import { and, count, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   kwtMembers,
@@ -28,6 +28,7 @@ import {
   getApiIndonesiaKey,
 } from "@/lib/api-indonesia";
 import { syncRegions } from "@/lib/regions-db";
+import { backfillPlatformFees } from "@/lib/fees-db";
 
 /**
  * Aksi superadmin — kelola seluruh platform via /admin.
@@ -180,14 +181,28 @@ export async function createResetLinkForUser(formData: FormData): Promise<void> 
   );
 }
 
+/** Cara pencairan fee yang dicatat superadmin (lihat juga src/lib/settlement.ts). */
+const SETTLEMENT_METHODS = ["transfer", "tunai", "otomatis"] as const;
+type SettlementMethod = (typeof SETTLEMENT_METHODS)[number];
+
 /**
- * Catat pencairan fee platform untuk satu KWT: jumlahkan seluruh fee yang belum
- * tercakup settlement sebelumnya, simpan baris pencairan, kembalikan rekapnya.
+ * Catat pencairan fee platform untuk satu KWT: jumlahkan seluruh fee aktif yang
+ * belum tercakup settlement sebelumnya, simpan baris pencairan (beserta cara dan
+ * referensi transfer), kembalikan rekapnya.
  */
 export async function recordSettlement(formData: FormData): Promise<void> {
   const session = await requireSuperadmin();
   const kwtId = String(formData.get("kwtId") ?? "");
   if (!kwtId) return;
+
+  const rawMethod = String(formData.get("method") ?? "transfer");
+  const method: SettlementMethod = (SETTLEMENT_METHODS as readonly string[]).includes(
+    rawMethod,
+  )
+    ? (rawMethod as SettlementMethod)
+    : "transfer";
+  const reference = String(formData.get("reference") ?? "").trim() || null;
+  const note = String(formData.get("note") ?? "").trim() || null;
 
   const [last] = await db
     .select({ settledThrough: kwtSettlements.settledThrough })
@@ -196,7 +211,11 @@ export async function recordSettlement(formData: FormData): Promise<void> {
     .orderBy(sql`${kwtSettlements.settledThrough} desc`)
     .limit(1);
 
-  const conditions = [eq(platformFees.kwtId, kwtId)];
+  // Hanya fee AKTIF (bukan hasil refund/pembatalan) yang boleh dicairkan.
+  const conditions = [
+    eq(platformFees.kwtId, kwtId),
+    isNull(platformFees.reversedAt),
+  ];
   if (last?.settledThrough) {
     conditions.push(gt(platformFees.createdAt, last.settledThrough));
   }
@@ -219,11 +238,50 @@ export async function recordSettlement(formData: FormData): Promise<void> {
     amount,
     settledThrough: new Date(),
     feeCount: Number(agg?.n ?? 0),
+    method,
+    reference,
+    note,
     createdBy: session.user.id,
   });
 
   revalidatePath("/admin/settlement");
   redirect("/admin/settlement?sukses=1");
+}
+
+/**
+ * Simpan rekening bank KWT untuk pencairan (diisi superadmin setelah verifikasi
+ * data dari pengurus). Kosongkan nilai untuk menghapus.
+ */
+export async function saveKwtBankAccount(formData: FormData): Promise<void> {
+  await requireSuperadmin();
+  const kwtId = String(formData.get("kwtId") ?? "");
+  if (!kwtId) return;
+
+  const bankName = String(formData.get("bankName") ?? "").trim() || null;
+  const bankAccountNumber =
+    String(formData.get("bankAccountNumber") ?? "").trim() || null;
+  const bankAccountHolder =
+    String(formData.get("bankAccountHolder") ?? "").trim() || null;
+
+  await db
+    .update(kwts)
+    .set({ bankName, bankAccountNumber, bankAccountHolder })
+    .where(eq(kwts.id, kwtId));
+
+  revalidatePath("/admin/settlement");
+  redirect("/admin/settlement?sukses=rekening");
+}
+
+/**
+ * Isi ulang baris ledger fee yang hilang (pesanan terbayar tanpa catatan fee).
+ * Idempoten: hanya mencatat yang belum ada, tidak mengubah baris lain.
+ */
+export async function syncFeeLedger(): Promise<void> {
+  await requireSuperadmin();
+  const result = await backfillPlatformFees();
+  revalidatePath("/admin");
+  revalidatePath("/admin/settlement");
+  redirect(`/admin?sukses=fee-backfill&n=${result.recorded}`);
 }
 
 /** Status token WA global untuk halaman /admin/pengaturan. */

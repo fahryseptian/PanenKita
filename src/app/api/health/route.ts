@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { countFeeLedgerDrift } from "@/lib/fees-db";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ const REQUIRED_IN_PRODUCTION = [
 /** Fitur opsional: aktif otomatis bila env-nya diisi. */
 const OPTIONAL_FEATURES = {
   whatsapp: "FONTE_TOKEN",
+  email: "RESEND_API_KEY",
   payment: "MIDTRANS_SERVER_KEY",
   uploads: "AWS_ACCESS_KEY_ID",
   googleLogin: "GOOGLE_CLIENT_ID",
@@ -51,10 +53,19 @@ export async function GET() {
   try {
     await db.execute(sql`select 1`);
     const config = configReport();
+    // Best-effort: pesanan terbayar tanpa catatan fee (0 = ledger sehat).
+    // Kegagalan hitung tidak boleh menggagalkan probe uptime.
+    let feeLedgerDrift: number | null = null;
+    try {
+      feeLedgerDrift = await countFeeLedgerDrift();
+    } catch (err) {
+      console.error("[health] fee ledger drift check failed", err);
+    }
     return NextResponse.json({
       ok: true,
       db: "up",
       wa: config.optional["whatsapp"] ? "configured" : "FONTE_TOKEN missing",
+      feeLedgerDrift,
       config,
       ts: new Date().toISOString(),
     });
