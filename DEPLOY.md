@@ -57,6 +57,8 @@ npm run db:seed
 | `CRON_SECRET` | ✅ (cron) | `openssl rand -hex 32` | Vercel kirim otomatis sbg `Bearer` |
 | `CRON_SHARED_SECRET` | ✅ (cron) | **sama dengan** `CRON_SECRET` | Dicek `/api/pricing/recompute` |
 | `FONTE_TOKEN` | ⬜ | Token device console.fonnte.com | Kosong = WA nonaktif, app tetap jalan |
+| `RESEND_API_KEY` | ⬜ | Dashboard Resend → API Keys | Kosong = email transaksional nonaktif (reset sandi tetap jalan via WA) |
+| `EMAIL_FROM` | ⬜ | `PanenKita <notifikasi@domainAnda.id>` | Wajib setelah domain diverifikasi; default `onboarding@resend.dev` (hanya bisa ke email pemilik akun) |
 | `MIDTRANS_SERVER_KEY` | ⬜ | Dashboard sandbox/production Midtrans | Kosong = bayar online nonaktif |
 | `MIDTRANS_CLIENT_KEY` | ⬜ | Pasangan server key | Untuk Snap.js di klien |
 | `MIDTRANS_IS_PRODUCTION` | ⬜ | `true` jika production key | Default sandbox |
@@ -72,6 +74,14 @@ npm run db:seed
 >
 > **Pemeriksaan konfigurasi:** `GET /api/health` mengembalikan `config.missingRequired`
 > (daftar nama env wajib yang belum diisi) tanpa pernah menampilkan nilainya.
+>
+> **Email (Resend):** reset kata sandi dikirim lewat **email + WhatsApp** (mana
+> pun yang tersedia). Verifikasi domain di dashboard Resend, lalu set
+> `EMAIL_FROM`. Cek kesiapan tanpa mengirim pesan:
+>
+> ```bash
+> npx tsx scripts/check-email.ts
+> ```
 
 4. Klik **Deploy** (± 2–3 menit).
 
@@ -98,7 +108,22 @@ npm run db:seed
    belum tampil di `/katalog` sampai disetujui di `/admin/kwt` (pembuatnya
    otomatis dikabari lewat WhatsApp bila nomornya terdaftar).
 
-5. Uji cepat:
+5. Operasional ledger fee platform:
+   - **Pencairan** dicatat di `/admin/settlement`: pilih KWT, isi **cara**
+     (transfer/tunai/otomatis) + **nomor referensi transfer**, lalu simpan
+     rekening KWT di kartu yang sama. Baris fee yang dibalik karena
+     refund/pembatalan tidak ikut dihitung.
+   - **Sinkronisasi ledger**: bila ada pesanan terbayar yang fee-nya belum
+     tercatat, `/admin` menampilkan peringatan kuning dengan tombol
+     *Sinkronkan ledger fee* (idempoten). Dari CLI:
+     ```bash
+     npm run backfill:fees -- --dry-run   # lihat dulu
+     npm run backfill:fees                # catat yang hilang
+     ```
+   - Ekspor CSV `/api/admin/export?type=fees` menyertakan kolom `Status`
+     (Aktif/Dibatalkan) supaya jejak audit refund tetap utuh.
+
+6. Uji cepat:
    - `/` landing + `/katalog` direktori tampil
    - Signup + daftar KWT baru → muncul di `/admin/kwt` sebagai menunggu
    - Setujui → katalog publik memuat kelompok tersebut

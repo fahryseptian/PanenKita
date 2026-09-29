@@ -7,6 +7,7 @@ import {
   gte,
   ilike,
   inArray,
+  isNull,
   or,
   sql,
   type SQL,
@@ -41,7 +42,13 @@ export async function getAdminOverview() {
       db
         .select({ total: sql<number>`coalesce(sum(${platformFees.totalFee}), 0)::int` })
         .from(platformFees)
-        .where(gte(platformFees.createdAt, since)),
+        .where(
+          and(
+            gte(platformFees.createdAt, since),
+            // Baris dibalik (refund/pembatalan) bukan pendapatan platform.
+            isNull(platformFees.reversedAt),
+          ),
+        ),
       db
         .select({ n: count() })
         .from(orders)
@@ -200,27 +207,37 @@ export async function listRecentOrders(limit = 10): Promise<AdminOrderRow[]> {
 export interface SettlementRow {
   kwtId: string;
   kwtName: string;
+  /** Rekening tujuan pencairan (diisi superadmin; bisa kosong). */
+  bankName: string | null;
+  bankAccountNumber: string | null;
+  bankAccountHolder: string | null;
   /** Fee belum tercairkan (setelah settlement terakhir). */
   unsettledAmount: number;
   unsettledCount: number;
-  /** Total fee sepanjang waktu (informasi). */
+  /** Total fee aktif sepanjang waktu (informasi). */
   totalAmount: number;
   settledThrough: Date | null;
 }
 
 /** Rekap fee per KWT: berapa yang sudah dicairkan dan berapa yang belum. */
 export async function listSettlements(): Promise<SettlementRow[]> {
-  // Subquery korelatif: fee setelah settlement terakhir dianggap belum tercairkan.
+  // Subquery korelatif: fee aktif setelah settlement terakhir dianggap belum tercairkan.
+  // Baris fee yang dibalik (reversed_at not null) tidak pernah ikut dihitung.
   const rows = await db
     .select({
       kwtId: kwts.id,
       kwtName: kwts.name,
+      bankName: kwts.bankName,
+      bankAccountNumber: kwts.bankAccountNumber,
+      bankAccountHolder: kwts.bankAccountHolder,
       totalAmount: sql<number>`coalesce((
-        select sum(pf.total_fee) from platform_fees pf where pf.kwt_id = ${kwts.id}
+        select sum(pf.total_fee) from platform_fees pf
+        where pf.kwt_id = ${kwts.id} and pf.reversed_at is null
       ), 0)::int`,
       unsettledAmount: sql<number>`coalesce((
         select sum(pf.total_fee) from platform_fees pf
         where pf.kwt_id = ${kwts.id}
+          and pf.reversed_at is null
           and pf.created_at > coalesce((
             select max(s.settled_through) from kwt_settlements s where s.kwt_id = ${kwts.id}
           ), to_timestamp(0))
@@ -228,6 +245,7 @@ export async function listSettlements(): Promise<SettlementRow[]> {
       unsettledCount: sql<number>`coalesce((
         select count(*) from platform_fees pf
         where pf.kwt_id = ${kwts.id}
+          and pf.reversed_at is null
           and pf.created_at > coalesce((
             select max(s.settled_through) from kwt_settlements s where s.kwt_id = ${kwts.id}
           ), to_timestamp(0))
@@ -242,6 +260,9 @@ export async function listSettlements(): Promise<SettlementRow[]> {
   return rows.map((r) => ({
     kwtId: r.kwtId,
     kwtName: r.kwtName,
+    bankName: r.bankName,
+    bankAccountNumber: r.bankAccountNumber,
+    bankAccountHolder: r.bankAccountHolder,
     unsettledAmount: Number(r.unsettledAmount),
     unsettledCount: Number(r.unsettledCount),
     totalAmount: Number(r.totalAmount),
@@ -261,7 +282,10 @@ export async function getUnsettledFees(kwtId: string): Promise<{
     .orderBy(desc(kwtSettlements.settledThrough))
     .limit(1);
 
-  const conds: SQL[] = [eq(platformFees.kwtId, kwtId)];
+  const conds: SQL[] = [
+    eq(platformFees.kwtId, kwtId),
+    isNull(platformFees.reversedAt),
+  ];
   if (last?.settledThrough) conds.push(gt(platformFees.createdAt, last.settledThrough));
 
   const [agg] = await db
@@ -283,6 +307,8 @@ export async function listSettlementHistory(limit = 20) {
       kwtName: kwts.name,
       amount: kwtSettlements.amount,
       feeCount: kwtSettlements.feeCount,
+      method: kwtSettlements.method,
+      reference: kwtSettlements.reference,
       settledThrough: kwtSettlements.settledThrough,
       createdAt: kwtSettlements.createdAt,
     })

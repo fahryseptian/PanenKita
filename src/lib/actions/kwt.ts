@@ -11,6 +11,8 @@ import { WA_TOKEN_KEY, deleteSetting, getWaTokenStatus, setSetting } from "@/lib
 import { API_INDONESIA_KEY_SETTING } from "@/lib/api-indonesia";
 import { syncRegions } from "@/lib/regions-db";
 import { sendWa, testMessage } from "@/lib/wa";
+import { isEmailEnabled, newKwtAlertEmail, sendEmail } from "@/lib/email";
+import { appUrl } from "@/lib/app-url";
 
 function slugify(text: string): string {
   return text
@@ -107,9 +109,48 @@ export async function createKwt(formData: FormData): Promise<void> {
     maxAge: 60 * 60 * 24 * 365,
   });
 
+  // Kabari superadmin lewat email: kelompok baru perlu ditinjau.
+  await alertSuperadminsOfNewKwt({
+    kwtName: input.name,
+    creatorName: session.user.name,
+    creatorEmail: session.user.email,
+    ...(input.regency ? { region: [input.regency, input.province].filter(Boolean).join(", ") } : {}),
+  });
+
   revalidatePath("/katalog");
   revalidatePath("/dashboard");
   redirect("/dashboard?baru=1");
+}
+
+/** Email ke semua superadmin: ada KWT baru menunggu persetujuan. */
+async function alertSuperadminsOfNewKwt(opts: {
+  kwtName: string;
+  creatorName: string;
+  creatorEmail: string;
+  region?: string;
+}): Promise<void> {
+  if (!isEmailEnabled()) return;
+  try {
+    const admins = await db
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.role, "superadmin"));
+    const recipients = admins.map((a) => a.email).filter(Boolean);
+    if (recipients.length === 0) return;
+
+    const template = newKwtAlertEmail({
+      ...opts,
+      adminUrl: `${appUrl()}/admin/kwt?status=pending`,
+    });
+    await sendEmail({
+      to: recipients,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  } catch (err) {
+    console.error("[kwt] failed to alert superadmins by email", err);
+  }
 }
 
 /**

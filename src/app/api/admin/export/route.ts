@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { kwtSettlements, kwts, orders, platformFees } from "@/lib/db/schema";
 import { getPlatformRole, getSession } from "@/lib/session";
 import { csvFilename, toCsv } from "@/lib/csv";
+import { settlementMethodLabel } from "@/lib/settlement";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ export async function GET(req: Request) {
   const today = new Date().toISOString().slice(0, 10);
 
   if (type === "fees") {
+    // Semua baris ledger diekspor (termasuk yang dibalik) dengan penanda status
+    // agar jejak audit lengkap; kolom "Berlaku" memisahkan pendapatan nyata.
     const rows = await db
       .select({
         orderNumber: orders.orderNumber,
@@ -34,6 +37,8 @@ export async function GET(req: Request) {
         handlingFee: platformFees.handlingFee,
         totalFee: platformFees.totalFee,
         netToKwt: platformFees.netToKwt,
+        reversedAt: platformFees.reversedAt,
+        reversedReason: platformFees.reversedReason,
         createdAt: platformFees.createdAt,
       })
       .from(platformFees)
@@ -53,6 +58,9 @@ export async function GET(req: Request) {
         "Handling",
         "Total Fee",
         "Bersih ke KWT",
+        "Status",
+        "Alasan Pembalikan",
+        "Waktu Pembalikan",
       ],
       rows.map((r) => [
         r.createdAt.toISOString(),
@@ -64,6 +72,9 @@ export async function GET(req: Request) {
         r.handlingFee,
         r.totalFee,
         r.netToKwt,
+        r.reversedAt ? "Dibatalkan" : "Aktif",
+        r.reversedReason ?? "",
+        r.reversedAt ? r.reversedAt.toISOString() : "",
       ]),
     );
     return csvResponse(csv, csvFilename(["fee-platform", today]));
@@ -75,6 +86,9 @@ export async function GET(req: Request) {
         kwtName: kwts.name,
         amount: kwtSettlements.amount,
         feeCount: kwtSettlements.feeCount,
+        method: kwtSettlements.method,
+        reference: kwtSettlements.reference,
+        note: kwtSettlements.note,
         settledThrough: kwtSettlements.settledThrough,
         createdAt: kwtSettlements.createdAt,
       })
@@ -84,11 +98,23 @@ export async function GET(req: Request) {
       .limit(5000);
 
     const csv = toCsv(
-      ["KWT", "Jumlah Cair", "Jumlah Fee", "Fee s/d", "Dicatat"],
+      [
+        "KWT",
+        "Jumlah Cair",
+        "Jumlah Fee",
+        "Cara",
+        "Referensi",
+        "Catatan",
+        "Fee s/d",
+        "Dicatat",
+      ],
       rows.map((r) => [
         r.kwtName,
         r.amount,
         r.feeCount,
+        settlementMethodLabel(r.method),
+        r.reference ?? "",
+        r.note ?? "",
         r.settledThrough.toISOString(),
         r.createdAt.toISOString(),
       ]),

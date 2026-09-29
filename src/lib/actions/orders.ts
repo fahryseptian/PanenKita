@@ -10,7 +10,7 @@ import { recomputeProductPrice } from "@/lib/pricing-db";
 import { getAvailableStock } from "@/lib/stock";
 import { sendWa, newOrderMessage, orderPaidMessage, orderConfirmMessage } from "@/lib/wa";
 import { formatRupiah } from "@/lib/format";
-import { recordPlatformFee } from "@/lib/fees-db";
+import { recordPlatformFee, reversePlatformFee } from "@/lib/fees-db";
 import { notifyStockOut } from "@/lib/stock-alerts";
 import { isMidtransEnabled } from "@/lib/midtrans";
 import { appUrl } from "@/lib/app-url";
@@ -19,6 +19,9 @@ import { pricingRules } from "@/lib/db/schema";
 import type { WholesaleTier } from "@/lib/wholesale";
 
 const ORDER_STATUSES = ["paid", "processing", "completed", "cancelled"] as const;
+
+/** Status yang berarti uang sudah masuk — fee platform ikut tercatat. */
+const PAID_ORDER_STATUSES = ["paid", "processing", "completed"] as const;
 
 /** Format rincian pesanan untuk pesan WA (dipakai admin & pembeli). */
 function waSummary(
@@ -246,6 +249,19 @@ export async function updateOrderStatus(formData: FormData): Promise<void> {
     patch.expiresAt = null;
   }
   await db.update(orders).set(patch).where(eq(orders.id, orderId));
+
+  // Batal/refund pesanan yang pernah terbayar → tarik kembali fee platformnya.
+  // Baris ledger tetap ada (audit), hanya ditandai dibalik. Bila pesanan
+  // dibayar lagi, recordPlatformFee otomatis membersihkan penanda ini.
+  const wasPaid =
+    PAID_ORDER_STATUSES.includes(order.status as (typeof PAID_ORDER_STATUSES)[number]) ||
+    Boolean(order.paymentSettledAt);
+  if (status === "cancelled" && wasPaid) {
+    await reversePlatformFee(order.id, {
+      reason: `Pesanan dibatalkan (status sebelumnya: ${order.status})`,
+      byUserId: ctx.userId,
+    });
+  }
 
   revalidatePath("/dashboard/pesanan");
   revalidatePath("/katalog");

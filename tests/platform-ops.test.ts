@@ -106,8 +106,8 @@ describe("manual reset link (no-WhatsApp users)", () => {
 
   it("alerts superadmins when a reset cannot be delivered", () => {
     const auth = read("src/lib/auth.ts");
-    expect(auth).toContain("alertSuperadminsWithoutPhone");
-    expect(auth).toContain("resetWithoutPhoneAlert");
+    expect(auth).toContain("alertSuperadminsOfUndeliverableReset");
+    expect(auth).toContain("resetUndeliverableAlert");
   });
 });
 
@@ -149,5 +149,63 @@ describe("PWA on iOS", () => {
     expect(icon).toContain("ImageResponse");
     expect(icon).toContain("width: 180");
     expect(read("src/app/layout.tsx")).toContain("appleWebApp");
+  });
+});
+
+describe("platform fee ledger", () => {
+  const fees = read("src/lib/fees-db.ts");
+  const orders = read("src/lib/actions/orders.ts");
+  const webhook = read("src/app/api/payment/webhook/route.ts");
+  const adminQueries = read("src/lib/admin-queries.ts");
+  const superadmin = read("src/lib/actions/superadmin.ts");
+  const exportRoute = read("src/app/api/admin/export/route.ts");
+
+  it("reverses the fee when a paid order is cancelled", () => {
+    expect(orders).toContain("reversePlatformFee");
+    expect(orders).toContain('status === "cancelled"');
+    expect(orders).toContain("PAID_ORDER_STATUSES");
+  });
+
+  it("reverses the fee on a Midtrans refund of a paid order", () => {
+    expect(webhook).toContain("reversePlatformFee");
+    expect(webhook).toContain("wasPaid");
+  });
+
+  it("keeps reversed rows as an audit trail and restores them on re-payment", () => {
+    expect(fees).toContain("reversedAt");
+    expect(fees).toContain("restorePlatformFee");
+    expect(fees).toContain("reversedReason");
+  });
+
+  it("excludes reversed rows from revenue aggregates and settlements", () => {
+    expect(adminQueries).toContain("isNull(platformFees.reversedAt)");
+    expect(adminQueries).toContain("pf.reversed_at is null");
+    expect(superadmin).toContain("isNull(platformFees.reversedAt)");
+  });
+
+  it("exports fee rows with their reversal status", () => {
+    expect(exportRoute).toContain("Dibatalkan");
+    expect(exportRoute).toContain("Alasan Pembalikan");
+    expect(exportRoute).toContain("Referensi");
+  });
+
+  it("records how each settlement was paid", () => {
+    expect(superadmin).toContain("SETTLEMENT_METHODS");
+    expect(superadmin).toContain("saveKwtBankAccount");
+    expect(superadmin).toContain("bankAccountNumber");
+    expect(read("src/app/admin/settlement/page.tsx")).toContain(
+      "saveKwtBankAccount",
+    );
+    expect(read("src/lib/settlement.ts")).toContain("SETTLEMENT_METHODS");
+  });
+
+  it("detects drift and can backfill the ledger", () => {
+    expect(fees).toContain("findFeeLedgerDrift");
+    expect(fees).toContain("backfillPlatformFees");
+    expect(fees).toContain("getFeeLedgerHealth");
+    expect(superadmin).toContain("syncFeeLedger");
+    expect(fees).toContain("countFeeLedgerDrift");
+    expect(read("src/app/api/health/route.ts")).toContain("feeLedgerDrift");
+    expect(read("scripts/backfill-fees.ts")).toContain("backfillPlatformFees");
   });
 });

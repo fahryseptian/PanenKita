@@ -5,7 +5,13 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { user as userTable } from "@/lib/db/schema";
 import * as schema from "@/lib/db/schema";
-import { passwordResetMessage, resetWithoutPhoneAlert, sendWa } from "@/lib/wa";
+import { passwordResetMessage, resetUndeliverableAlert, sendWa } from "@/lib/wa";
+import {
+  isEmailEnabled,
+  passwordResetEmail,
+  sendEmail,
+  verifyEmailTemplate,
+} from "@/lib/email";
 import { appUrl } from "@/lib/app-url";
 
 const googleConfigured =
@@ -36,28 +42,73 @@ export const auth = betterAuth({
         .from(userTable)
         .where(eq(userTable.id, user.id))
         .limit(1);
-      if (!row?.phone) {
-        // Tanpa nomor WA tautan tak bisa dikirim: beri tahu superadmin agar
-        // bisa membantu lewat "Tautan reset" di /admin/pengguna.
+      // Kanal 1 — email (semua akun punya email).
+      let delivered = false;
+      if (isEmailEnabled()) {
+        const template = passwordResetEmail({ name: user.name, url });
+        const result = await sendEmail({
+          to: user.email,
+          subject: template.subject,
+          html: template.html,
+          text: template.text,
+        });
+        delivered = result.ok;
+        if (!result.ok) {
+          console.error("[auth] reset email failed", result.error);
+        }
+      }
+
+      // Kanal 2 — WhatsApp, bila nomornya terdaftar.
+      if (row?.phone) {
+        await sendWa(
+          "password_reset",
+          null,
+          { phone: row.phone, name: user.name },
+          passwordResetMessage({ name: user.name, resetUrl: url }),
+          undefined,
+          user.id,
+        );
+        delivered = true;
+      }
+
+      // Dua kanal gagal → superadmin bisa menolong lewat /admin/pengguna.
+      if (!delivered) {
         console.warn(
-          "[auth] reset requested without WhatsApp number; alerting superadmins",
+          "[auth] reset link could not be delivered; alerting superadmins",
           { userId: user.id },
         );
-        await alertSuperadminsWithoutPhone({
+        await alertSuperadminsOfUndeliverableReset({
           userName: user.name,
           userEmail: user.email,
         });
-        return;
       }
-      await sendWa(
-        "password_reset",
-        null,
-        { phone: row.phone, name: user.name },
-        passwordResetMessage({ name: user.name, resetUrl: url }),
-        undefined,
-        user.id,
-      );
     },
+    /** Email verifikasi saat pendaftaran (soft — login tetap bisa tanpa verifikasi). */
+    sendVerificationEmail: async ({
+      user,
+      url,
+    }: {
+      user: { name: string; email: string };
+      url: string;
+    }) => {
+      if (!isEmailEnabled()) return;
+      const template = verifyEmailTemplate({ name: user.name, url });
+      const result = await sendEmail({
+        to: user.email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+      if (!result.ok) {
+        console.error("[auth] verification email failed", result.error);
+      }
+    },
+  },
+  /** Kirim email verifikasi otomatis setelah daftar (tanpa memblokir login). */
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    expiresIn: 60 * 60,
   },
   /** Blokir brute-force endpoint sensitif (login, request reset, reset). */
   rateLimit: { enabled: true, window: 60, max: 20 },
@@ -94,25 +145,35 @@ export const auth = betterAuth({
   },
 });
 
-/** Kirim peringatan WA ke semua superadmin yang punya nomor terdaftar. */
-async function alertSuperadminsWithoutPhone(opts: {
+/** Kirim peringatan ke semua superadmin (WA bila ada nomor, plus email). */
+async function alertSuperadminsOfUndeliverableReset(opts: {
   userName: string;
   userEmail: string;
 }): Promise<void> {
   try {
     const admins = await db
-      .select({ name: userTable.name, phone: userTable.phone })
+      .select({ name: userTable.name, phone: userTable.phone, email: userTable.email })
       .from(userTable)
       .where(eq(userTable.role, "superadmin"));
-    const message = resetWithoutPhoneAlert(opts);
+    if (admins.length === 0) return;
+
+    const message = resetUndeliverableAlert(opts);
     for (const admin of admins) {
-      if (!admin.phone) continue;
-      await sendWa(
-        "password_reset",
-        null,
-        { phone: admin.phone, name: admin.name },
-        message,
-      );
+      if (admin.phone) {
+        await sendWa("password_reset", null, { phone: admin.phone, name: admin.name }, message);
+      }
+    }
+
+    if (isEmailEnabled()) {
+      const emails = admins.map((a) => a.email).filter(Boolean);
+      if (emails.length > 0) {
+        await sendEmail({
+          to: emails,
+          subject: "Permintaan reset kata sandi tidak terkirim",
+          html: `<p>${opts.userName} (${opts.userEmail}) meminta atur ulang kata sandi, tetapi tautan tidak bisa dikirim (tanpa nomor WhatsApp dan email gagal).</p><p>Buat tautan reset manual di /admin/pengguna setelah memverifikasi identitasnya.</p>`,
+          text: `${opts.userName} (${opts.userEmail}) gagal menerima tautan reset. Buat tautan manual di /admin/pengguna.`,
+        });
+      }
     }
   } catch (err) {
     console.error("[auth] failed to alert superadmins", err);
