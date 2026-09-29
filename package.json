@@ -12,7 +12,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
-    "promote:superadmin": "tsx scripts/promote-superadmin.ts"
+    "promote:superadmin": "tsx scripts/promote-superadmin.ts",
+    "backfill:fees": "tsx scripts/backfill-fees.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1141.0",
@@ -31,6 +32,7 @@
     "postgres": "^3.4.9",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "resend": "^6.31.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {

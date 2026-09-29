@@ -54,7 +54,8 @@ describe("password reset pages", () => {
   });
 
   it("forgot page is anti-enumeration (always success message)", () => {
-    expect(forgot).toContain("Jika email terdaftar");
+    expect(forgot).toContain("Jika email tersebut terdaftar");
+    expect(forgot).toContain("email");
   });
 
   it("reset page validates token, length, and confirmation", () => {

@@ -275,8 +275,11 @@ export function kwtRejectedMessage(opts: { kwtName: string; reason?: string }): 
   ].join("\n");
 }
 
-/** Peringatan ke superadmin: ada permintaan reset tanpa nomor WhatsApp. */
-export function resetWithoutPhoneAlert(opts: {
+/**
+ * Peringatan ke superadmin: permintaan reset tidak bisa dikirim lewat kanal
+ * mana pun (tanpa nomor WA dan email gagal/tidak diaktifkan).
+ */
+export function resetUndeliverableAlert(opts: {
   userName: string;
   userEmail: string;
 }): string {
@@ -284,7 +287,7 @@ export function resetWithoutPhoneAlert(opts: {
     `🔑 *Permintaan reset kata sandi*`,
     ``,
     `${opts.userName} (${opts.userEmail}) meminta atur ulang kata sandi,`,
-    `tetapi akunnya belum punya nomor WhatsApp terdaftar sehingga tautan tidak bisa dikirim.`,
+    `tetapi tautan tidak terkirim — akun tanpa nomor WhatsApp dan email tidak aktif/gagal.`,
     ``,
     `Bantu dengan membuat tautan reset dari /admin/pengguna setelah memverifikasi identitasnya.`,
   ].join("\n");
