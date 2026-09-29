@@ -6,8 +6,8 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: process.env.NEXT_PUBLIC_PRODUCT_NAME ?? "TaniKita",
-    short_name: "TaniKita",
+    name: process.env.NEXT_PUBLIC_PRODUCT_NAME ?? "PanenKita",
+    short_name: "PanenKita",
     description:
       "Katalog panen KWT: stok segar, harga dinamis transparan, pesanan via WhatsApp.",
     start_url: "/",

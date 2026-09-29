@@ -1,4 +1,4 @@
-# TaniKita 🌾
+# PanenKita 🌾
 
 Platform katalog panen untuk **KWT (Kelompok Tani Wanita)**: anggota mencatat hasil panen, katalog publik menampilkan produk beserta stok dan harga, pesanan masuk lewat WhatsApp, dan pembayaran digital via Midtrans Snap. Harga jual disesuaikan otomatis oleh **Dynamic Pricing Engine** berbasis stok & permintaan — transparan dengan jejak audit.
 

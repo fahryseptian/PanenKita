@@ -76,7 +76,7 @@ export default async function KatalogIndexPage({
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
             <Leaf className="h-4 w-4" />
           </span>
-          <span className="font-bold">TaniKita</span>
+          <span className="font-bold">PanenKita</span>
           <Link
             href="/login"
             className="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"

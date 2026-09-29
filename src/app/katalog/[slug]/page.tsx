@@ -169,7 +169,7 @@ export default async function CatalogPage({ params, searchParams }: Props) {
       </main>
 
       <footer className="border-t border-slate-100 py-6 text-center text-xs text-slate-400">
-        Ditenagai TaniKita 🌾
+        Ditenagai PanenKita 🌾
       </footer>
     </div>
   );
