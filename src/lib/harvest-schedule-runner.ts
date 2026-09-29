@@ -4,15 +4,18 @@ import {
   harvestSchedules,
   harvests,
   kwtMembers,
+  kwts,
   products,
   user,
 } from "@/lib/db/schema";
 import { recomputeProductPrice } from "@/lib/pricing-db";
 import { sendWa, scheduledHarvestMessage } from "@/lib/wa";
+import { fetchHolidays, fetchWeather, isBadWeather } from "@/lib/api-indonesia";
 
 export interface ScheduleRunResult {
   executed: number;
   notified: number;
+  skippedHoliday?: boolean;
 }
 
 /**
@@ -23,6 +26,11 @@ export interface ScheduleRunResult {
 export async function runDueHarvestSchedules(
   dayOfWeek: number,
 ): Promise<ScheduleRunResult> {
+  // Hari libur nasional/cuti bersama: panen otomatis ditunda (hemat 1 kredit/hari).
+  if (await isNationalHoliday(new Date())) {
+    return { executed: 0, notified: 0, skippedHoliday: true };
+  }
+
   const schedules = await db
     .select({
       id: harvestSchedules.id,
@@ -66,6 +74,30 @@ export async function runDueHarvestSchedules(
       .limit(1);
     if (already.length > 0) continue;
 
+    // Cek cuaca kab/kota KWT sebelum eksekusi (2 kredit, cache 6 jam di API).
+    const weatherNote = await weatherWarningForKwt(s.kwtId);
+    if (weatherNote?.severe) {
+      // Cuaca buruk: jangan catat panen, cukup WA peringatan ke pelaksana.
+      try {
+        const [executor] = await db
+          .select({ phone: user.phone, name: user.name })
+          .from(user)
+          .where(eq(user.id, s.memberId))
+          .limit(1);
+        if (executor?.phone) {
+          await sendWa(
+            "harvest",
+            s.kwtId,
+            { phone: executor.phone, name: executor.name },
+            weatherHarvestWarning(s.productName, weatherNote.desc),
+          );
+        }
+      } catch (err) {
+        console.error("[harvest-schedule] weather warn failed", err);
+      }
+      continue;
+    }
+
     await db.insert(harvests).values({
       productId: s.productId,
       memberId: s.memberId,
@@ -73,7 +105,7 @@ export async function runDueHarvestSchedules(
       wasteQty: "0",
       wasteDestination: "hilang",
       quality: s.quality as "A" | "B" | "C",
-      note: "Panen otomatis (jadwal)",
+      note: weatherNote ? `Panen otomatis (jadwal) — catatan: ${weatherNote.desc}` : "Panen otomatis (jadwal)",
     });
     await recomputeProductPrice(s.productId);
     executed += 1;
@@ -108,4 +140,56 @@ export async function runDueHarvestSchedules(
     }
   }
   return { executed, notified };
+}
+
+/** True bila hari ini (UTC tanggal) libur nasional/cuti bersama. */
+async function isNationalHoliday(date: Date): Promise<boolean> {
+  try {
+    const holidays = await fetchHolidays(date.getUTCFullYear());
+    const ymd = date.toISOString().slice(0, 10);
+    return holidays.some((h) => h.date === ymd);
+  } catch (err) {
+    // API gagal/key belum ada -> jangan blok panen karena itu.
+    console.error("[harvest-schedule] holiday check failed", err);
+    return false;
+  }
+}
+
+export interface WeatherNote {
+  severe: boolean;
+  desc: string;
+}
+
+/**
+ * Prakiraan cuaca kab/kota KWT untuk beberapa jam ke depan.
+ * severe = ada indikasi hujan/badai -> panen otomatis ditunda + WA peringatan.
+ */
+async function weatherWarningForKwt(kwtId: string): Promise<WeatherNote | null> {
+  try {
+    const [kwt] = await db
+      .select({ regionCode: kwts.regionCode })
+      .from(kwts)
+      .where(eq(kwts.id, kwtId))
+      .limit(1);
+    if (!kwt?.regionCode) return null; // wilayah belum diisi via dropdown resmi
+
+    const rows = await fetchWeather(kwt.regionCode);
+    if (rows.length === 0) return null;
+    const next = rows[0]!;
+    return { severe: isBadWeather(next.weather_desc), desc: next.weather_desc };
+  } catch (err) {
+    console.error("[harvest-schedule] weather check failed", err);
+    return null;
+  }
+}
+
+/** Pesan WA peringatan cuaca ke pelaksana panen otomatis. */
+export function weatherHarvestWarning(productName: string, weatherDesc: string): string {
+  return [
+    `🌧️ *Panen otomatis ditunda — cuaca buruk*`,
+    ``,
+    `Prakiraan BMKG: ${weatherDesc}.`,
+    `Panen otomatis untuk ${productName} tidak dijalankan hari ini demi kualitas hasil.`,
+    `Catat panen manual di dashboard bila kondisi di lapangan aman.`,
+  ].join("\n");
 }

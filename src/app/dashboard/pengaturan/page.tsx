@@ -1,10 +1,14 @@
 import { requireAdmin } from "@/lib/session";
 import { getKwtById } from "@/lib/queries";
 import { getWaTokenStatus } from "@/lib/app-settings";
+import { getApiIndonesiaKey } from "@/lib/api-indonesia";
+import { listProvinces } from "@/lib/regions-db";
 import {
   clearWaToken,
   rotateInviteCode,
+  saveApiIndonesiaKey,
   saveWaToken,
+  syncRegionsAction,
   updateKwtProfile,
 } from "@/lib/actions/kwt";
 
@@ -21,6 +25,10 @@ export default async function KwtSettingsPage({
   const sp = await searchParams;
   const kwt = await getKwtById(ctx.kwtId);
   if (!kwt) return null;
+  const [apiConfigured, provinceCount] = await Promise.all([
+    getApiIndonesiaKey().then(Boolean),
+    listProvinces().then((p) => p.length).catch(() => 0),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -45,6 +53,16 @@ export default async function KwtSettingsPage({
       {sp.sukses && sp.sukses !== "wa" && sp.sukses !== "wa-clear" && (
         <p className="rounded-lg bg-brand-50 px-4 py-2 text-sm text-brand-700">
           ✅ Profil kelompok diperbarui.
+        </p>
+      )}
+      {sp.sukses === "api-key" && (
+        <p className="rounded-lg bg-brand-50 px-4 py-2 text-sm text-brand-700">
+          ✅ API key apiindonesia.id tersimpan — jalankan "Sinkron wilayah" untuk mengisi dropdown.
+        </p>
+      )}
+      {sp.sukses === "sync" && (
+        <p className="rounded-lg bg-brand-50 px-4 py-2 text-sm text-brand-700">
+          ✅ Cache wilayah diperbarui — dropdown resmi aktif di form pendaftaran.
         </p>
       )}
       {sp.error && (
@@ -120,6 +138,51 @@ export default async function KwtSettingsPage({
 
       {/* Token WA — diatur admin tanpa akses Vercel */}
       <WaTokenSection status={await getWaTokenStatus()} />
+
+      {/* Data publik Indonesia (apiindonesia.id): API key + sinkron wilayah */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        <h2 className="font-semibold">🗺️ Data wilayah resmi (apiindonesia.id)</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Mengisi dropdown provinsi & kab/kota yang resmi (Kepmendagri) di form
+          pendaftaran, plus cuaca BMKG untuk jadwal panen otomatis. API key dari
+          dashboard.apiindonesia.id — tier gratis 1.000 request/bulan cukup.
+        </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-medium ${apiConfigured ? "bg-brand-50 text-brand-700" : "bg-amber-50 text-amber-700"}`}>
+            {apiConfigured ? "✅ API key terpasang" : "⚠️ API key belum dipasang"}
+          </span>
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-medium ${provinceCount > 0 ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-500"}`}>
+            Cache wilayah: {provinceCount} provinsi
+          </span>
+        </div>
+
+        <form action={saveApiIndonesiaKey} className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            type="password"
+            name="key"
+            required
+            minLength={10}
+            placeholder="Tempel API key (aip_live_...)"
+            autoComplete="off"
+            className="min-w-60 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+          />
+          <button type="submit" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+            Simpan key
+          </button>
+        </form>
+
+        <form action={syncRegionsAction} className="mt-2">
+          <button
+            type="submit"
+            disabled={!apiConfigured}
+            title={apiConfigured ? "Sinkronkan provinsi + kab/kota (~6 request API)" : "Isi API key dulu"}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Sinkron wilayah ({provinceCount > 0 ? "perbarui" : "isi pertama kali"})
+          </button>
+        </form>
+      </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
         <h2 className="font-semibold">Kode undangan</h2>

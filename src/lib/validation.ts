@@ -98,6 +98,8 @@ export const kwtRegistrationSchema = z.object({
   regency: z.string().trim().min(1, "Kabupaten/kota wajib diisi").max(80),
   province: z.string().trim().max(80).optional(),
   address: z.string().trim().max(200).optional(),
+  /** Kode wilayah kab/kota resmi (apiindonesia.id) — opsional */
+  regionCode: z.string().trim().max(10).optional(),
 });
 
 export type KwtRegistrationInput = z.infer<typeof kwtRegistrationSchema>;

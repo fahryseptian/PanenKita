@@ -8,6 +8,8 @@ import { kwtMembers, kwts, pricingRules, products, user } from "@/lib/db/schema"
 import { ACTIVE_KWT_COOKIE, requireAdmin, requireSession } from "@/lib/session";
 import { kwtRegistrationSchema } from "@/lib/validation";
 import { WA_TOKEN_KEY, deleteSetting, getWaTokenStatus, setSetting } from "@/lib/app-settings";
+import { API_INDONESIA_KEY_SETTING } from "@/lib/api-indonesia";
+import { syncRegions } from "@/lib/regions-db";
 import { sendWa, testMessage } from "@/lib/wa";
 
 function slugify(text: string): string {
@@ -54,6 +56,7 @@ export async function createKwt(formData: FormData): Promise<void> {
     regency: formData.get("regency"),
     province: formData.get("province") || undefined,
     address: formData.get("address") || undefined,
+    regionCode: formData.get("regionCode") || undefined,
   });
   if (!parsed.success) {
     redirect(`/daftar-kwt?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Data tidak valid")}`);
@@ -83,6 +86,7 @@ export async function createKwt(formData: FormData): Promise<void> {
       regency: input.regency,
       province: input.province || null,
       address: input.address || null,
+      regionCode: input.regionCode || null,
       inviteCode,
     })
     .returning();
@@ -202,6 +206,30 @@ export async function clearWaToken(): Promise<void> {
 export async function waTokenStatus() {
   await requireAdmin();
   return getWaTokenStatus();
+}
+
+/** Simpan API key apiindonesia.id di app_settings. */
+export async function saveApiIndonesiaKey(formData: FormData): Promise<void> {
+  const ctx = await requireAdmin();
+  const key = String(formData.get("key") ?? "").trim();
+  if (!key) return;
+  await setSetting(API_INDONESIA_KEY_SETTING, key);
+  revalidatePath("/dashboard/pengaturan");
+  redirect(`/dashboard/pengaturan?sukses=api-key&kwt=${ctx.kwtId}`);
+}
+
+/** Sinkronkan cache wilayah dari apiindonesia.id (~6 request API). */
+export async function syncRegionsAction(): Promise<void> {
+  await requireAdmin();
+  try {
+    await syncRegions();
+    revalidatePath("/dashboard/pengaturan");
+    revalidatePath("/daftar-kwt");
+    redirect("/dashboard/pengaturan?sukses=sync");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Sync gagal";
+    redirect(`/dashboard/pengaturan?error=${encodeURIComponent(msg)}`);
+  }
 }
 
 /** Putar kode undangan KWT (admin) — kode lama tidak berlaku lagi. */

@@ -166,6 +166,28 @@ export const verification = pgTable("verification", {
 // Product tables
 // ---------------------------------------------------------------------------
 
+/**
+ * Cache lokal data wilayah Indonesia (provinsi & kab/kota) dari apiindonesia.id.
+ * Disinkronkan berkala dari API (hemat kredit); dibaca gratis oleh form & direktori.
+ */
+export const regions = pgTable(
+  "regions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Kode wilayah dari apiindonesia.id (Kepmendagri), mis. "32" atau "3273" */
+    code: text("code").notNull(),
+    /** "provinsi" | "kabupaten" */
+    level: text("level").notNull(),
+    name: text("name").notNull(),
+    /** Kode provinsi induk (null untuk level provinsi) */
+    parentCode: text("parent_code"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("regions_code_level_key").on(t.code, t.level)],
+);
+
 export const kwts = pgTable(
   "kwts",
   {
@@ -177,6 +199,8 @@ export const kwts = pgTable(
     regency: text("regency"),
     /** Provinsi — untuk direktori publik */
     province: text("province"),
+    /** Kode wilayah kab/kota (apiindonesia.id) — opsional, dari dropdown resmi */
+    regionCode: text("region_code"),
     inviteCode: text("invite_code"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
