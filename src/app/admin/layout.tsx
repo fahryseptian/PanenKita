@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Leaf, ShieldCheck } from "lucide-react";
 import { requireSuperadminPage } from "@/lib/session";
+import { NotificationBell } from "@/app/dashboard/notification-bell";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export const metadata = { title: "Admin Platform" };
 const ADMIN_NAV = [
   { href: "/admin", label: "Ringkasan" },
   { href: "/admin/kwt", label: "Kelompok KWT" },
+  { href: "/admin/settlement", label: "Pencairan Fee" },
   { href: "/admin/pengguna", label: "Pengguna" },
   { href: "/admin/pengaturan", label: "Pengaturan" },
 ];
@@ -43,8 +45,15 @@ export default async function AdminLayout({
           ))}
         </nav>
         <div className="border-t border-slate-100 p-4">
-          <p className="truncate text-sm font-medium">{session.user.name}</p>
-          <p className="truncate text-xs text-slate-400">{session.user.email}</p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{session.user.name}</p>
+              <p className="truncate text-xs text-slate-400">
+                {session.user.email}
+              </p>
+            </div>
+            <NotificationBell />
+          </div>
           <Link
             href="/dashboard"
             className="mt-3 flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-brand-600"
@@ -61,6 +70,7 @@ export default async function AdminLayout({
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 overflow-x-auto border-b border-slate-200 bg-white px-4 md:hidden">
           <ShieldCheck className="h-5 w-5 shrink-0 text-brand-600" />
           <span className="shrink-0 text-sm font-semibold">Admin</span>
+          <NotificationBell />
           <nav className="flex gap-2">
             {ADMIN_NAV.map((item) => (
               <Link

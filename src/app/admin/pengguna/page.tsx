@@ -1,6 +1,6 @@
-import { ShieldCheck, ShieldOff } from "lucide-react";
+import { KeyRound, ShieldCheck, ShieldOff } from "lucide-react";
 import { listUsers } from "@/lib/admin-queries";
-import { setUserRole } from "@/lib/actions/superadmin";
+import { createResetLinkForUser, setUserRole } from "@/lib/actions/superadmin";
 import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -8,10 +8,13 @@ export const dynamic = "force-dynamic";
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; resetToken?: string; resetEmail?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, resetToken, resetEmail } = await searchParams;
   const users = await listUsers(q);
+  const resetLink = resetToken
+    ? `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/reset-password?token=${resetToken}`
+    : null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -22,6 +25,22 @@ export default async function AdminUsersPage({
           dashboard masing-masing kelompok.
         </p>
       </header>
+
+      {resetLink && (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">
+            Tautan reset untuk {resetEmail}
+          </p>
+          <p className="mt-1 text-xs text-amber-800">
+            Berlaku 1 jam dan hanya bisa dipakai sekali. Kirim ke pengguna
+            <b> hanya setelah Anda memverifikasi identitasnya</b> (mis. lewat
+            telepon/pengurus KWT).
+          </p>
+          <code className="mt-3 block break-all rounded-lg bg-white px-3 py-2 text-xs text-slate-700 ring-1 ring-amber-200">
+            {resetLink}
+          </code>
+        </section>
+      )}
 
       <form className="flex gap-2" action="/admin/pengguna">
         <input
@@ -48,7 +67,7 @@ export default async function AdminUsersPage({
               <th className="px-4 py-2.5">KWT</th>
               <th className="px-4 py-2.5">Role Platform</th>
               <th className="hidden px-4 py-2.5 md:table-cell">Terdaftar</th>
-              <th className="px-4 py-2.5"></th>
+              <th className="px-4 py-2.5">Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -86,7 +105,19 @@ export default async function AdminUsersPage({
                     {formatDate(u.createdAt)}
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    {u.role === "superadmin" ? (
+                    <div className="flex items-center justify-end gap-3">
+                      <form action={createResetLinkForUser}>
+                        <input type="hidden" name="userId" value={u.id} />
+                        <button
+                          type="submit"
+                          className="text-xs font-medium text-slate-400 hover:text-brand-600"
+                          title="Buat tautan reset manual (untuk pengguna tanpa WhatsApp)"
+                        >
+                          <KeyRound className="mr-1 inline h-3.5 w-3.5" />
+                          Tautan reset
+                        </button>
+                      </form>
+                      {u.role === "superadmin" ? (
                       <form action={setUserRole}>
                         <input type="hidden" name="userId" value={u.id} />
                         <input type="hidden" name="role" value="user" />
@@ -110,7 +141,8 @@ export default async function AdminUsersPage({
                           Jadikan superadmin
                         </button>
                       </form>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

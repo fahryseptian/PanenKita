@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { Check, RotateCcw, X } from "lucide-react";
+import { Check, EyeOff, Play, RotateCcw, X } from "lucide-react";
 import { listKwts, getKwtCounts } from "@/lib/admin-queries";
 import {
   approveKwt,
   rejectKwt,
   resetKwtToPending,
+  resumeKwt,
+  suspendKwt,
 } from "@/lib/actions/superadmin";
 import { formatDate } from "@/lib/format";
 
@@ -13,9 +15,17 @@ export const dynamic = "force-dynamic";
 const TABS = [
   { key: "pending", label: "Menunggu" },
   { key: "approved", label: "Disetujui" },
+  { key: "suspended", label: "Disuspend" },
   { key: "rejected", label: "Ditolak" },
   { key: "all", label: "Semua" },
 ];
+
+const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+  approved: { label: "Disetujui", cls: "bg-emerald-50 text-emerald-700" },
+  pending: { label: "Menunggu", cls: "bg-amber-50 text-amber-700" },
+  suspended: { label: "Disuspend", cls: "bg-slate-200 text-slate-700" },
+  rejected: { label: "Ditolak", cls: "bg-red-50 text-red-600" },
+};
 
 export default async function AdminKwtPage({
   searchParams,
@@ -74,18 +84,10 @@ export default async function AdminKwtPage({
                     <h2 className="font-semibold">{k.name}</h2>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        k.status === "approved"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : k.status === "pending"
-                            ? "bg-amber-50 text-amber-700"
-                            : "bg-red-50 text-red-600"
+                        (STATUS_BADGE[k.status] ?? STATUS_BADGE["pending"]!).cls
                       }`}
                     >
-                      {k.status === "approved"
-                        ? "Disetujui"
-                        : k.status === "pending"
-                          ? "Menunggu"
-                          : "Ditolak"}
+                      {(STATUS_BADGE[k.status] ?? STATUS_BADGE["pending"]!).label}
                     </span>
                   </div>
                   <p className="mt-0.5 text-sm text-slate-500">
@@ -110,8 +112,20 @@ export default async function AdminKwtPage({
                   </p>
                 </div>
 
-                <div className="flex shrink-0 gap-2">
-                  {k.status !== "approved" && (
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  {k.status === "suspended" && (
+                    <form action={resumeKwt}>
+                      <input type="hidden" name="kwtId" value={k.id} />
+                      <button
+                        type="submit"
+                        className="flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700"
+                      >
+                        <Play className="h-4 w-4" />
+                        Aktifkan
+                      </button>
+                    </form>
+                  )}
+                  {k.status !== "approved" && k.status !== "suspended" && (
                     <form action={approveKwt}>
                       <input type="hidden" name="kwtId" value={k.id} />
                       <button
@@ -120,6 +134,19 @@ export default async function AdminKwtPage({
                       >
                         <Check className="h-4 w-4" />
                         Setujui
+                      </button>
+                    </form>
+                  )}
+                  {k.status === "approved" && (
+                    <form action={suspendKwt}>
+                      <input type="hidden" name="kwtId" value={k.id} />
+                      <button
+                        type="submit"
+                        className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50"
+                        title="Sembunyikan dari katalog tanpa menghapus data"
+                      >
+                        <EyeOff className="h-4 w-4" />
+                        Suspend
                       </button>
                     </form>
                   )}
@@ -136,7 +163,7 @@ export default async function AdminKwtPage({
                       </button>
                     </form>
                   )}
-                  {k.status !== "rejected" && (
+                  {k.status !== "rejected" && k.status !== "suspended" && (
                     <form action={rejectKwt}>
                       <input type="hidden" name="kwtId" value={k.id} />
                       <button

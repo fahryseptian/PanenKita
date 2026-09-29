@@ -18,6 +18,12 @@ export const metadata: Metadata = {
     template: `%s · ${productName}`,
   },
   manifest: "/manifest.webmanifest",
+  // iOS: tombol "Tambahkan ke Layar Utama" memakai apple-icon.tsx
+  appleWebApp: {
+    capable: true,
+    title: productName,
+    statusBarStyle: "default",
+  },
   description:
     "Platform katalog panen untuk KWT: stok & harga selalu segar, harga dinamis yang transparan, notifikasi WhatsApp instan, pembayaran digital.",
   openGraph: {

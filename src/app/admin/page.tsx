@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   BadgeCheck,
   Clock,
+  Download,
   HandCoins,
   Store,
   Users,
@@ -46,7 +47,7 @@ export default async function AdminOverviewPage() {
       label: "KWT disetujui",
       value: `${overview.kwtApproved}`,
       icon: Store,
-      hint: `${overview.kwtPending} pending · ${overview.kwtRejected} ditolak`,
+      hint: `${overview.kwtPending} pending · ${overview.kwtSuspended} disuspend · ${overview.kwtRejected} ditolak`,
     },
     {
       label: "Pengguna",
@@ -87,6 +88,36 @@ export default async function AdminOverviewPage() {
             <p className="mt-0.5 text-[11px] text-slate-400">{m.hint}</p>
           </div>
         ))}
+      </section>
+
+      <section className="flex flex-wrap gap-2">
+        <Link
+          href="/admin/settlement"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-brand-50 hover:text-brand-700"
+        >
+          Pencairan fee KWT →
+        </Link>
+        <a
+          href="/api/admin/export?type=orders"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-brand-50 hover:text-brand-700"
+        >
+          <Download className="h-4 w-4" />
+          Ekspor pesanan (CSV)
+        </a>
+        <a
+          href="/api/admin/export?type=fees"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-brand-50 hover:text-brand-700"
+        >
+          <Download className="h-4 w-4" />
+          Ekspor fee platform (CSV)
+        </a>
+        <a
+          href="/api/admin/export?type=settlements"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-brand-50 hover:text-brand-700"
+        >
+          <Download className="h-4 w-4" />
+          Ekspor pencairan (CSV)
+        </a>
       </section>
 
       <section>

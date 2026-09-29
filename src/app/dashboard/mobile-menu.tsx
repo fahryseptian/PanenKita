@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, ShieldCheck, X } from "lucide-react";
 import { NAV } from "./nav-items";
 import { KwtSwitcher } from "./kwt-switcher";
 import { SignOutButton } from "./sign-out-button";
@@ -15,6 +15,7 @@ import { SignOutButton } from "./sign-out-button";
  */
 export function MobileMenu({
   isAdmin,
+  isSuperadmin,
   kwtId,
   kwtName,
   userName,
@@ -22,6 +23,7 @@ export function MobileMenu({
   memberships,
 }: {
   isAdmin: boolean;
+  isSuperadmin: boolean;
   kwtId: string;
   kwtName: string;
   userName: string;
@@ -77,6 +79,16 @@ export function MobileMenu({
             </div>
 
             <nav className="max-h-[60vh] overflow-y-auto p-2">
+              {isSuperadmin && (
+                <Link
+                  href="/admin"
+                  onClick={close}
+                  className="mb-1 flex items-center gap-3 rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  Panel Admin
+                </Link>
+              )}
               {items.map((item) => {
                 const active = pathname === item.href;
                 return (

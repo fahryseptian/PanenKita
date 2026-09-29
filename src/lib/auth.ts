@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { user as userTable } from "@/lib/db/schema";
 import * as schema from "@/lib/db/schema";
-import { passwordResetMessage, sendWa } from "@/lib/wa";
+import { passwordResetMessage, resetWithoutPhoneAlert, sendWa } from "@/lib/wa";
 import { appUrl } from "@/lib/app-url";
 
 const googleConfigured =
@@ -37,10 +37,16 @@ export const auth = betterAuth({
         .where(eq(userTable.id, user.id))
         .limit(1);
       if (!row?.phone) {
-        console.error(
-          "[auth] cannot send password reset: user has no WhatsApp number",
+        // Tanpa nomor WA tautan tak bisa dikirim: beri tahu superadmin agar
+        // bisa membantu lewat "Tautan reset" di /admin/pengguna.
+        console.warn(
+          "[auth] reset requested without WhatsApp number; alerting superadmins",
           { userId: user.id },
         );
+        await alertSuperadminsWithoutPhone({
+          userName: user.name,
+          userEmail: user.email,
+        });
         return;
       }
       await sendWa(
@@ -67,6 +73,16 @@ export const auth = betterAuth({
     additionalFields: {
       /** Nomor WhatsApp, format 628xxxxxxxxxx */
       phone: { type: "string", required: false, input: true },
+      /**
+       * Role level platform. `input: false` — hanya bisa diubah lewat CLI/aksi
+       * superadmin, tidak pernah bisa diset sendiri saat signup.
+       */
+      role: {
+        type: "string",
+        required: false,
+        input: false,
+        defaultValue: "user",
+      },
       /** Ikut menerima notifikasi perubahan harga via WhatsApp */
       waOptIn: {
         type: "boolean",
@@ -77,5 +93,30 @@ export const auth = betterAuth({
     },
   },
 });
+
+/** Kirim peringatan WA ke semua superadmin yang punya nomor terdaftar. */
+async function alertSuperadminsWithoutPhone(opts: {
+  userName: string;
+  userEmail: string;
+}): Promise<void> {
+  try {
+    const admins = await db
+      .select({ name: userTable.name, phone: userTable.phone })
+      .from(userTable)
+      .where(eq(userTable.role, "superadmin"));
+    const message = resetWithoutPhoneAlert(opts);
+    for (const admin of admins) {
+      if (!admin.phone) continue;
+      await sendWa(
+        "password_reset",
+        null,
+        { phone: admin.phone, name: admin.name },
+        message,
+      );
+    }
+  } catch (err) {
+    console.error("[auth] failed to alert superadmins", err);
+  }
+}
 
 export type Session = typeof auth.$Infer.Session;
