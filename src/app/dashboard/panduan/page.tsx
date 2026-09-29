@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireKwtContext } from "@/lib/session";
 import {
   getDashboardOverview,
@@ -6,6 +7,7 @@ import {
 } from "@/lib/queries";
 import { formatDateTime } from "@/lib/format";
 import { FeedbackForm } from "./feedback-form";
+import { RetryWaButton } from "./retry-wa-button";
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +22,15 @@ export default async function GuidePage() {
   ]);
 
   const waSent = notifs.filter((n) => n.sent).length;
-  const waFailed = notifs.length - waSent;
+  const failed = notifs.filter((n) => !n.sent);
+  const waFailed = failed.length;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Panduan & Pilot</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Cara memakai PanenKita + metrik uji coba terbatas untuk KWT Anda.
+          Cara memakai TaniKita + metrik uji coba terbatas untuk KWT Anda.
         </p>
       </header>
 
@@ -80,6 +83,52 @@ export default async function GuidePage() {
             <p className="text-xs text-slate-500">{m.label}</p>
           </div>
         ))}
+      </section>
+
+      {failed.length > 0 && (
+        <section className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
+          <h2 className="font-semibold text-red-700">⚠️ WhatsApp gagal terkirim</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Pesan di bawah tidak sampai ke penerima. Klik <b>Kirim ulang</b> setelah memastikan
+            device Fonnte aktif.
+          </p>
+          <div className="mt-3 divide-y divide-red-100 overflow-hidden rounded-xl border border-red-100 bg-white">
+            {failed.slice(0, 20).map((n) => (
+              <div key={n.id} className="flex items-start gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-slate-700">
+                    {n.kind} · {n.target} · {formatDateTime(n.createdAt)}
+                  </p>
+                  <p className="mt-0.5 line-clamp-2 text-sm text-slate-500">{n.message}</p>
+                  <p className="mt-0.5 text-xs text-red-500">{n.error}</p>
+                </div>
+                <RetryWaButton id={n.id} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        <h2 className="font-semibold">📥 Ekspor data (CSV)</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Unduh data KWT untuk arsip atau dibuka di Excel.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[
+            ["panen", "Panen"],
+            ["produk", "Produk"],
+            ["notifikasi", "Notifikasi WA"],
+            ["harga", "Audit harga"],
+          ].map(([jenis, label]) => (
+            <a
+              key={jenis}
+              href={`/api/data/export?jenis=${jenis}`}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700"
+            >{label}</a>
+          ))}
+        </div>
+        <small className="mt-2 block text-[10px] text-slate-400">File juga tersedia via tombol ekspor di halaman Panen & Produk.</small>
       </section>
 
       <FeedbackSection kwtId={ctx.kwtId} feedbackRows={feedbackRows} />

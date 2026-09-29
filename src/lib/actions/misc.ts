@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { feedback, user } from "@/lib/db/schema";
+import { feedback, notifications, user } from "@/lib/db/schema";
 import { requireKwtContext, requireSession } from "@/lib/session";
 import { feedbackInputSchema, normalizePhone } from "@/lib/validation";
 import { sendWa, testMessage } from "@/lib/wa";
@@ -35,6 +35,45 @@ export async function sendTestWa(formData: FormData) {
   await sendWa("test", ctx.kwtId, { phone, name: ctx.userName }, testMessage(ctx.userName));
   revalidatePath("/dashboard/profil");
   return { ok: true as const };
+}
+
+/** Kirim ulang notifikasi WhatsApp yang gagal (maks. 20 terbaru, bila token tersedia). */
+export async function resendFailedWa(formData: FormData) {
+  const ctx = await requireKwtContext();
+  const id = String(formData.get("id") ?? "");
+
+  const [notif] = await db
+    .select()
+    .from(notifications)
+    .where(and(eq(notifications.id, id), eq(notifications.kwtId, ctx.kwtId)))
+    .limit(1);
+  if (!notif || notif.sent) {
+    return { ok: false as const, error: "Notifikasi tidak ditemukan atau sudah terkirim" };
+  }
+  if (!process.env.FONTE_TOKEN) {
+    return { ok: false as const, error: "FONTE_TOKEN belum diset di server" };
+  }
+
+  // Target kembali ke nomor penerima asli (bukan target override seperti productId).
+  const phone = /^\d{8,15}$/.test(notif.target) ? notif.target : null;
+  if (!phone) {
+    return { ok: false as const, error: "Target asli bukan nomor WA (mis. log dedupe)" };
+  }
+
+  const { sendWa } = await import("@/lib/wa");
+  await sendWa(notif.kind, ctx.kwtId, { phone }, notif.message);
+
+  const [latest] = await db
+    .select({ sent: notifications.sent })
+    .from(notifications)
+    .where(eq(notifications.kwtId, ctx.kwtId))
+    .orderBy(desc(notifications.createdAt))
+    .limit(1);
+
+  revalidatePath("/dashboard/panduan");
+  return latest?.sent
+    ? { ok: true as const }
+    : { ok: false as const, error: "Pengiriman gagal lagi — periksa token/device Fonnte" };
 }
 
 /** Umpan balik pilot project. */

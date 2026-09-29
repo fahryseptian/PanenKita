@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { orderItems, orders, products } from "@/lib/db/schema";
 import { createSnapToken, isMidtransEnabled, snapPayUrl } from "@/lib/midtrans";
 import { formatRupiah } from "@/lib/format";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,15 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as Body | null;
   if (!body?.orderId) {
     return NextResponse.json({ ok: false, error: "orderId wajib" }, { status: 400 });
+  }
+
+  // Rate limit: maks 30 permintaan token/jam per IP (Snap token mahal dibuat).
+  const rl = rateLimit(`snap:${clientIp(req)}`, 30, 3_600_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "Terlalu banyak permintaan. Coba lagi nanti." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
   }
   if (!isMidtransEnabled()) {
     return NextResponse.json(

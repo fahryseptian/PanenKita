@@ -83,6 +83,42 @@ export interface DashboardOverview {
   paidRevenue: number;
 }
 
+export interface RecentProduct {
+  id: string;
+  name: string;
+  unit: string;
+  currentPrice: number;
+  photoUrl: string | null;
+  available: number;
+  kwtName: string;
+  kwtSlug: string;
+}
+
+/** Produk terbaru di seluruh platform — untuk strip "Baru ditambahkan" di katalog depan. */
+export async function getRecentProducts(limit = 8): Promise<RecentProduct[]> {
+  const rows = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      unit: products.unit,
+      currentPrice: products.currentPrice,
+      photoUrl: products.photoUrl,
+      kwtName: kwts.name,
+      kwtSlug: kwts.slug,
+    })
+    .from(products)
+    .innerJoin(kwts, eq(products.kwtId, kwts.id))
+    .where(eq(products.isActive, true))
+    .orderBy(desc(products.createdAt))
+    .limit(limit);
+
+  const stock = await getAvailableStock(rows.map((r) => r.id));
+  return rows.map((r) => ({
+    ...r,
+    available: Math.max(0, stock.get(r.id)?.available ?? 0),
+  }));
+}
+
 export async function getDashboardOverview(kwtId: string): Promise<DashboardOverview> {
   const since = new Date(Date.now() - 30 * 24 * 3_600_000);
 
@@ -244,6 +280,7 @@ export interface OrderRow {
   total: number;
   midtransOrderId: string | null;
   createdAt: Date;
+  expiresAt: Date | null;
   items: OrderItemRow[];
 }
 
@@ -277,11 +314,11 @@ export async function getOrders(
     orderNumber: o.orderNumber,
     buyerName: o.buyerName,
     buyerPhone: o.buyerPhone,
-    note: o.note,
-    status: o.status,
-    total: o.total,
-    midtransOrderId: o.midtransOrderId,
-    createdAt: o.createdAt,
+    note: o.note,      status: o.status,
+      total: o.total,
+      midtransOrderId: o.midtransOrderId,
+      createdAt: o.createdAt,
+      expiresAt: o.expiresAt,
     items: itemRows
       .filter((i) => i.orderId === o.id)
       .map((i) => ({

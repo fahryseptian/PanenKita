@@ -39,7 +39,7 @@ export default async function CetakLaporanPage({
         <p className="text-sm font-semibold">{kwt?.name ?? ctx.kwtName}</p>
         <p className="text-xs text-slate-600">
           {[kwt?.regency, kwt?.province].filter(Boolean).join(", ") || "Indonesia"}
-          {" · "}Platform PanenKita
+          {" · "}Platform TaniKita
         </p>
         <p className="mt-1 text-xs text-slate-600">
           Periode: {dari} s.d. {sampai} · Dicetak {formatDate(new Date())}
@@ -183,7 +183,7 @@ export default async function CetakLaporanPage({
       </section>
 
       <footer className="mt-8 border-t border-slate-200 pt-2 text-center text-[10px] text-slate-400">
-        Dokumen dihasilkan otomatis oleh PanenKita · {formatYmd(new Date())}
+        Dokumen dihasilkan otomatis oleh TaniKita · {formatYmd(new Date())}
       </footer>
 
       {/* CSS cetak */}

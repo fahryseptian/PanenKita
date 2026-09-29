@@ -35,6 +35,7 @@ export const orderStatusEnum = pgEnum("order_status", [
   "processing",
   "completed",
   "cancelled",
+  "expired",
 ]);
 export const pricingEventTypeEnum = pgEnum("pricing_event_type", [
   "recompute",
@@ -44,10 +45,13 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "harvest",
   "price_change",
   "new_order",
+  "order_created",
   "order_paid",
+  "stock_out",
+  "order_expired",
+  "broadcast",
   "test",
 ]);
-
 // ---------------------------------------------------------------------------
 // Better Auth tables (generated with the auth CLI, kept in our schema)
 // ---------------------------------------------------------------------------
@@ -254,6 +258,12 @@ export const orders = pgTable(
     /** Nomor pesanan Midtrans (snap token reference) */
     midtransOrderId: text("midtrans_order_id"),
     paymentSettledAt: timestamp("payment_settled_at", { withTimezone: true }),
+    /**
+     * Batas waktu pembayaran — setelah ini pesanan pending dibatalkan
+     * otomatis oleh cron (set status expired) dan stok kembali tersedia.
+     * Null = tidak ada batas (mis. pesanan lama sebelum fitur ini).
+     */
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -262,6 +272,8 @@ export const orders = pgTable(
     uniqueIndex("orders_number_key").on(t.orderNumber),
     uniqueIndex("orders_midtrans_key").on(t.midtransOrderId),
     index("orders_kwt_status_idx").on(t.kwtId, t.status),
+    // Untuk cron: cari pending yang lewat batas waktu secara efisien.
+    index("orders_expires_idx").on(t.status, t.expiresAt),
   ],
 );
 

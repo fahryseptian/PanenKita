@@ -1,4 +1,4 @@
-# PanenKita 🌾
+# TaniKita 🌾
 
 Platform katalog panen untuk **KWT (Kelompok Tani Wanita)**: anggota mencatat hasil panen, katalog publik menampilkan produk beserta stok dan harga, pesanan masuk lewat WhatsApp, dan pembayaran digital via Midtrans Snap. Harga jual disesuaikan otomatis oleh **Dynamic Pricing Engine** berbasis stok & permintaan — transparan dengan jejak audit.
 
@@ -7,6 +7,7 @@ Platform katalog panen untuk **KWT (Kelompok Tani Wanita)**: anggota mencatat ha
 - **Fase 1 — MVP**: basis data (Drizzle/Neon), autentikasi + peran (ketua/bendahara/anggota), katalog publik, CRUD produk, input panen.
 - **Fase 2**: intake pesanan (nama + nomor WA, tanpa akun), Dynamic Pricing Engine (aturan stok & permintaan), notifikasi WhatsApp instan via Fonnte.
 - **Fase 3**: pembayaran Midtrans Snap + webhook terverifikasi, audit mobile-responsive, halaman panduan & formulir umpan balik pilot.
+- **Fase 4 — operasional & ketahanan**: pesanan pending kedaluwarsa otomatis (stok tak terkunci), rate limiting API publik, pengaturan profil KWT + rotasi kode undangan, manajemen anggota lengkap (hapus/keluar/transfer ketua), peringatan WA stok habis (dedupe 24 jam), override aturan harga per produk dari UI, cek status pesanan untuk pembeli (`/cek-pesanan`), ekspor CSV panen & produk, health endpoint `/api/health`, security headers, dan PWA manifest.
 
 ## Struktur
 
@@ -45,6 +46,9 @@ npm run dev            # http://localhost:3000
 
 ### Cron recompute harga (opsional, Fase 2)
 Buat Vercel Cron yang memanggil `GET /api/pricing/recompute` setiap 15 menit dengan header `x-cron-secret` (isi `CRON_SHARED_SECRET`). Harga juga dihitung ulang otomatis setiap panen dicatat / pesanan berubah status.
+
+### Cron kedaluwarsa pesanan (Fase 4)
+`vercel.json` sudah memuat cron `GET /api/orders/expire` tiap 15 menit: pesanan pending yang melewati batas 24 jam (kolom `orders.expires_at`) dibatalkan otomatis (status `expired`), stok kembali, harga dihitung ulang, dan pengurus dapat WA. Batas waktu dapat diubah lewat `ORDER_PENDING_HOURS` di `src/lib/validation.ts`.
 
 ## Integrasi
 

@@ -3,6 +3,10 @@
     {
       "path": "/api/pricing/recompute",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/orders/expire",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

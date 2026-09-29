@@ -1,5 +1,5 @@
 /**
- * Kategori produk kanonik PanenKita.
+ * Kategori produk kanonik TaniKita.
  * Kategori lama berupa teks bebas; helper di sini memetakannya ke daftar
  * resmi agar filter direktori konsisten.
  */

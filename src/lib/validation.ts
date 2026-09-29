@@ -78,6 +78,12 @@ export const orderInputSchema = z.object({
     .max(20),
 });
 
+/**
+ * Batas waktu pembayaran pesanan pending (jam). Pembatalan otomatis oleh cron
+ * setelah lewat; stok langsung dianggap bebas oleh stock.ts.
+ */
+export const ORDER_PENDING_HOURS = 24;
+
 export const feedbackInputSchema = z.object({
   rating: z.coerce.number().int().min(1).max(5),
   message: z.string().trim().min(1, "Pesan wajib diisi").max(1_000),

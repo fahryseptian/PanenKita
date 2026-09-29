@@ -12,7 +12,11 @@ export type NotificationKind =
   | "harvest"
   | "price_change"
   | "new_order"
+  | "order_created"
   | "order_paid"
+  | "stock_out"
+  | "order_expired"
+  | "broadcast"
   | "test";
 
 export interface WaRecipient {
@@ -27,6 +31,8 @@ export async function sendWa(
   kwtId: string,
   recipient: WaRecipient,
   message: string,
+  /** Override target di log notifikasi (mis. productId untuk dedupe stok). */
+  logTargetOverride?: string,
 ): Promise<void> {
   const token = process.env.FONTE_TOKEN;
   let sent = false;
@@ -66,7 +72,7 @@ export async function sendWa(
     await db.insert(notifications).values({
       kwtId,
       kind,
-      target: recipient.phone,
+      target: logTargetOverride ?? recipient.phone,
       message,
       sent,
       error,
@@ -128,7 +134,7 @@ export function newOrderMessage(opts: {
     ``,
     `Total: *${formatRupiah(opts.total)}*`,
     ``,
-    `Konfirmasi & atur status di dashboard PanenKita.`,
+    `Konfirmasi & atur status di dashboard TaniKita.`,
   ].join("\n");
 }
 
@@ -152,6 +158,8 @@ export function orderConfirmMessage(opts: {
   summary: string;
   total: number;
   payUrl?: string | null;
+  /** Batas waktu pembayaran (opsional). */
+  expiresAt?: Date | null;
 }): string {
   const lines = [
     `🧺 *Pesanan ${opts.orderNumber} diterima*`,
@@ -166,9 +174,59 @@ export function orderConfirmMessage(opts: {
   } else {
     lines.push(``, `Pembayaran diatur dengan pengurus KWT.`);
   }
+  if (opts.expiresAt) {
+    const sampa = new Date(opts.expiresAt).toLocaleString("id-ID", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    lines.push(``, `⏳ Selesaikan pembayaran sebelum ${sampa} WIB, ya — setelah itu pesanan otomatis dibatalkan dan stok dilepas.`);
+  }
+  lines.push(``, `Cek status: ketuk link halaman pesanan yang Anda simpan.`);
   return lines.join("\n");
 }
 
+/** Notifikasi ke pengurus: pesanan pending kedaluwarsa otomatis. */
+export function orderExpiredMessage(opts: {
+  orderNumber: string;
+  buyerName: string;
+  total: number;
+}): string {
+  return [
+    `⌛ *Pesanan kedaluwarsa*`,
+    ``,
+    `Pesanan ${opts.orderNumber} dari ${opts.buyerName} (${formatRupiah(opts.total)}) dibatalkan otomatis karena tidak dibayar sebelum batas waktu.`,
+    `Stok produk sudah kembali tersedia di katalog.`,
+  ].join("\n");
+}
+
+/** Notifikasi ke pengurus: stok produk habis. */
+export function stockOutMessage(opts: {
+  productName: string;
+  unit: string;
+}): string {
+  return [
+    `🚨 *Stok habis*`,
+    ``,
+    `Stok ${opts.productName} sudah 0 ${opts.unit}. Katalog menampilkan "Habis" — catat panen baru agar bisa dipesan lagi.`,
+  ].join("\n");
+}
+
+/** Pesan broadcast pengumuman ke anggota/pengurus KWT. */
+export function broadcastMessage(opts: {
+  kwtName: string;
+  text: string;
+}): string {
+  return [
+    `📣 *Pengumuman ${opts.kwtName}*,`,
+    ``,
+    opts.text,
+    ``,
+    `— dikirim via TaniKita`,
+  ].join("\n");
+}
+
 export function testMessage(name: string): string {
-  return `👋 Halo ${name}! Ini pesan uji dari PanenKita. Jika Anda menerima ini, notifikasi WhatsApp berfungsi normal. 🌾`;
+  return `👋 Halo ${name}! Ini pesan uji dari TaniKita. Jika Anda menerima ini, notifikasi WhatsApp berfungsi normal. 🌾`;
 }

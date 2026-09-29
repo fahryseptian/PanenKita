@@ -4,7 +4,7 @@ import { CheckCircle2, Clock, MessageCircle } from "lucide-react";
 import { db } from "@/lib/db";
 import { orderItems, orders, products } from "@/lib/db/schema";
 import { getKwtBySlug } from "@/lib/queries";
-import { formatRupiah, formatDateTime } from "@/lib/format";
+import { formatRupiah, formatDateTime, formatQuantity } from "@/lib/format";
 import { isMidtransEnabled } from "@/lib/midtrans";
 import { PayButton } from "./pay-button";
 
@@ -16,6 +16,7 @@ const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
   processing: { text: "Disiapkan", cls: "bg-brand-50 text-brand-700" },
   completed: { text: "Selesai", cls: "bg-brand-50 text-brand-700" },
   cancelled: { text: "Dibatalkan", cls: "bg-red-50 text-red-600" },
+  expired: { text: "Kedaluwarsa — silakan pesan ulang", cls: "bg-red-50 text-red-600" },
 };
 
 interface Props {
@@ -54,7 +55,7 @@ export default async function OrderPage({ params }: Props) {
           <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${status.cls}`}>
             {order.status === "pending" ? (
               <Clock className="h-7 w-7" />
-            ) : order.status === "cancelled" ? (
+            ) : order.status === "cancelled" || order.status === "expired" ? (
               <span className="text-2xl">❌</span>
             ) : (
               <CheckCircle2 className="h-7 w-7" />
@@ -69,10 +70,10 @@ export default async function OrderPage({ params }: Props) {
             {items.map((i, idx) => (
               <div key={idx} className="flex justify-between text-sm">
                 <span className="text-slate-600">
-                  {i.productName} × {Number(i.quantity)} {i.unit}
+                  {i.productName} × {formatQuantity(Number(i.quantity))} {i.unit}
                 </span>
                 <span className="tabular-nums">
-                  {formatRupiah(Math.round(Number(i.quantity)) * i.unitPrice)}
+                  {formatRupiah(Math.round(Number(i.quantity) * i.unitPrice))}
                 </span>
               </div>
             ))}
@@ -85,6 +86,13 @@ export default async function OrderPage({ params }: Props) {
           {order.note && (
             <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-left text-sm text-slate-500">
               📝 {order.note}
+            </p>
+          )}
+
+          {order.status === "pending" && order.expiresAt && (
+            <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-center text-xs text-amber-700">
+              ⏳ Selesaikan pembayaran sebelum {formatDateTime(order.expiresAt)} — setelah itu
+              pesanan otomatis dibatalkan dan stok dilepas.
             </p>
           )}
 
@@ -101,6 +109,12 @@ export default async function OrderPage({ params }: Props) {
           <p className="mt-4 text-xs text-slate-400">
             Dibuat {formatDateTime(order.createdAt)} · simpan halaman ini untuk cek status
           </p>
+          <a
+            href="/cek-pesanan"
+            className="mt-2 inline-block text-xs font-medium text-slate-500 hover:underline"
+          >
+            Kehilangan link? Cek pesanan lewat nomor pesanan + nomor WA →
+          </a>
           <a
             href={`/katalog/${slug}`}
             className="mt-4 inline-block text-sm font-medium text-brand-600 hover:underline"

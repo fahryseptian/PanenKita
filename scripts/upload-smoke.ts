@@ -21,7 +21,7 @@ async function main() {
   const put = await fetch(uploadUrl, {
     method: "PUT",
     headers: { "Content-Type": "text/plain" },
-    body: `PanenKita smoke test ${new Date().toISOString()}`,
+    body: `TaniKita smoke test ${new Date().toISOString()}`,
   });
   console.log("   status:", put.status);
   if (!put.ok) {
@@ -39,7 +39,7 @@ async function main() {
   const get = await fetch(getUrl);
   const body = await get.text();
   console.log("   status:", get.status, "| isi:", body.slice(0, 60));
-  if (get.status !== 200 || !body.includes("PanenKita smoke test")) {
+  if (get.status !== 200 || !body.includes("TaniKita smoke test")) {
     console.error("FAIL: isi tidak cocok");
     process.exit(1);
   }

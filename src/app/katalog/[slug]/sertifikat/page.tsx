@@ -50,7 +50,7 @@ export default async function CertificatePage({ params }: Props) {
       <div className="mx-auto max-w-3xl border-8 border-double border-brand-700 bg-white p-10 shadow-lg print:border-4 print:shadow-none">
         <header className="text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-brand-600">
-            PanenKita 🌾
+            TaniKita 🌾
           </p>
           <h1 className="mt-4 text-3xl font-bold uppercase tracking-wide text-slate-900">
             Sertifikat Zero-Waste
@@ -125,7 +125,7 @@ export default async function CertificatePage({ params }: Props) {
           pangan dikonsumsi/didonasi 2,5 kg CO₂e/kg; komposting aerobik 0,5 kg
           CO₂e/kg (estimasi konservatif, Food Wastage Footprint FAO/WRAP). Angka
           bersifat estimasi berbasis catatan panen & penjualan digital di platform
-          PanenKita dan dapat diverifikasi dari riwayat transaksi.
+          TaniKita dan dapat diverifikasi dari riwayat transaksi.
         </section>
 
         {/* Tanda tangan */}
@@ -137,7 +137,7 @@ export default async function CertificatePage({ params }: Props) {
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500">Diverifikasi oleh</p>
-            <p className="font-semibold text-brand-700">PanenKita</p>
+            <p className="font-semibold text-brand-700">TaniKita</p>
             <div className="mt-8 w-44 border-t border-slate-400 pt-1 text-xs text-slate-500">
               {formatDate(new Date())}
             </div>

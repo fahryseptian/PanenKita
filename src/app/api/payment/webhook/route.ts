@@ -47,7 +47,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
-  // Idempoten: jangan proses ulang transaksi final
+  // Idempoten: jangan proses ulang transaksi final (expired masih bisa dibayar
+  // jika Snap token lama diselesaikan — pembayaran nyata tetap dihormati).
   if (["paid", "completed", "cancelled"].includes(order.status)) {
     return NextResponse.json({ ok: true, idempotent: true });
   }
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
   if (status === "paid") {
     await db
       .update(orders)
-      .set({ status: "paid", paymentSettledAt: new Date() })
+      .set({ status: "paid", paymentSettledAt: new Date(), expiresAt: null })
       .where(eq(orders.id, order.id));
     await recordPlatformFee({ id: order.id, kwtId: order.kwtId, total: order.total });
     await sendWa(

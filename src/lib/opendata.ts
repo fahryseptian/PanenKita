@@ -1,4 +1,4 @@
-import { and, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { harvests, orders, orderItems, products } from "@/lib/db/schema";
 
@@ -164,11 +164,17 @@ export async function getPlatformVolume(since?: Date): Promise<PlatformVolume> {
         : inArray(orders.status, paidStatuses),
     );
 
+  // KWT dianggap aktif bila punya ≥1 produk aktif (katalog terbuka untuk publik).
+  const [kRow] = await db
+    .select({ count: sql<number>`count(distinct ${products.kwtId})::int` })
+    .from(products)
+    .where(eq(products.isActive, true));
+
   return {
     totalHarvestedKg: Number(hRow?.total ?? 0),
     totalWasteKg: Number(hRow?.waste ?? 0),
     paidOrderCount: Number(oRow?.count ?? 0),
     paidGmv: Number(oRow?.gmv ?? 0),
-    activeKwtCount: 0, // diisi pemanggil bila perlu
+    activeKwtCount: Number(kRow?.count ?? 0),
   };
 }

@@ -5,7 +5,7 @@ import {
   getPricingRules,
 } from "@/lib/queries";
 import { formatRupiah, formatDateTime } from "@/lib/format";
-import { recomputeAllPrices } from "@/lib/actions/pricing";
+import { recomputeAllPrices, saveProductPricingRule } from "@/lib/actions/pricing";
 import { saveWholesaleTiers, saveCommissionSettings } from "@/lib/actions/monetisasi";
 import { getKwtFeeSummary } from "@/lib/fees-db";
 import { DEFAULT_COMMISSION } from "@/lib/komisi";
@@ -71,7 +71,8 @@ export default async function PricingPage() {
           </li>
         </ul>
         <p className="mt-3 text-xs text-slate-400">
-          Aturan khusus per produk (override) bisa ditambahkan lewat tabel pricing_rules.
+          Aturan default berlaku untuk semua produk; tiap produk bisa dioverride di daftar
+          di bawah ("Aturan khusus produk ini").
         </p>
       </section>
 
@@ -157,6 +158,56 @@ export default async function PricingPage() {
                     <p className="text-xs text-slate-400">dasar {formatRupiah(p.basePrice)}</p>
                   </div>
                 </div>
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-medium text-brand-600 hover:underline">
+                    Aturan khusus produk ini
+                  </summary>
+                  <form
+                    action={saveProductPricingRule}
+                    className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4"
+                  >
+                    <input type="hidden" name="productId" value={p.id} />
+                    {(
+                      [
+                        { name: "lowStockThreshold", label: "Stok menipis ≤", value: Number(rule?.lowStockThreshold ?? DEFAULT_RULE.lowStockThreshold) },
+                        { name: "lowStockPercent", label: "Markup %", value: rule?.lowStockPercent ?? DEFAULT_RULE.lowStockPercent },
+                        { name: "highStockThreshold", label: "Stok menumpuk ≥", value: Number(rule?.highStockThreshold ?? DEFAULT_RULE.highStockThreshold) },
+                        { name: "highStockPercent", label: "Diskon %", value: rule?.highStockPercent ?? DEFAULT_RULE.highStockPercent },
+                        { name: "surgeMinOrders", label: "Surge ≥ pesanan", value: rule?.surgeMinOrders ?? DEFAULT_RULE.surgeMinOrders },
+                        { name: "surgePercent", label: "Surge %", value: rule?.surgePercent ?? DEFAULT_RULE.surgePercent },
+                        { name: "minPricePercent", label: "Batas bawah %", value: rule?.minPricePercent ?? DEFAULT_RULE.minPricePercent },
+                        { name: "maxPricePercent", label: "Batas atas %", value: rule?.maxPricePercent ?? DEFAULT_RULE.maxPricePercent },
+                      ] as const
+                    ).map((f) => (
+                      <div key={f.name}>
+                        <label
+                          htmlFor={`${p.id}-${f.name}`}
+                          className="mb-0.5 block text-[10px] font-medium text-slate-400"
+                        >
+                          {f.label}
+                        </label>
+                        <input
+                          id={`${p.id}-${f.name}`}
+                          name={f.name}
+                          type="number"
+                          defaultValue={f.value}
+                          className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs tabular-nums outline-none focus:border-brand-500"
+                        />
+                      </div>
+                    ))}
+                    <div className="col-span-2 flex items-center gap-2 sm:col-span-4">
+                      <button
+                        type="submit"
+                        className="rounded-lg bg-slate-800 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-900"
+                      >
+                        Simpan aturan
+                      </button>
+                      <span className="text-[10px] text-slate-400">
+                        Kosongkan semua lalu simpan = kembali ke aturan default.
+                      </span>
+                    </div>
+                  </form>
+                </details>
                 <form action={saveWholesaleTiers} className="mt-2 flex items-center gap-2">
                   <input type="hidden" name="productId" value={p.id} />
                   <input

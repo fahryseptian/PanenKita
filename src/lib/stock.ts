@@ -23,6 +23,8 @@ export type StockHoldingStatus = (typeof STOCK_HOLDING_STATUSES)[number];
  * Stok tersedia = total panen − jumlah pesanan aktif.
  * Dihitung on-the-fly dari dua tabel agar tidak pernah drift;
  * "completed" tetap memegang stok karena barang dianggap sudah keluar.
+ * Pesanan pending yang sudah lewat expiresAt dianggap kedaluwarsa dan
+ * TIDAK lagi memegang stok (cron akan memfinalisasi statusnya belakangan).
  */
 export async function getAvailableStock(
   productIds: string[],
@@ -44,6 +46,7 @@ export async function getAvailableStock(
         productId: orderItems.productId,
         quantity: orderItems.quantity,
         status: orders.status,
+        expiresAt: orders.expiresAt,
       })
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
@@ -60,6 +63,14 @@ export async function getAvailableStock(
   }
   for (const row of itemRows) {
     if (!isStockHolding(row.status)) continue;
+    // Pesanan pending yang lewat batas waktu tidak lagi memegang stok.
+    if (
+      row.status === "pending" &&
+      row.expiresAt !== null &&
+      row.expiresAt.getTime() <= Date.now()
+    ) {
+      continue;
+    }
     const info = result.get(row.productId);
     if (info) info.reserved += Number(row.quantity);
   }

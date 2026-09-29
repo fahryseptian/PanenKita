@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { harvests, kwtMembers, products, user } from "@/lib/db/schema";
+import { getAvailableStock } from "@/lib/stock";
 import { requireKwtContext } from "@/lib/session";
 import { harvestInputSchema } from "@/lib/validation";
 import { recomputeProductPrice } from "@/lib/pricing-db";
+import { notifyStockOut } from "@/lib/stock-alerts";
 import { sendWa, harvestMessage } from "@/lib/wa";
 
 export async function recordHarvest(formData: FormData): Promise<void> {
@@ -107,6 +109,11 @@ export async function updateHarvestWaste(formData: FormData): Promise<void> {
     })
     .where(eq(harvests.id, id));
   await recomputeProductPrice(row.productId);
+  // Limbah naik bisa membuat stok menyentuh 0 -> peringatkan pengurus.
+  const stockAfter = await getAvailableStock([row.productId]);
+  if ((stockAfter.get(row.productId)?.available ?? 0) <= 0) {
+    await notifyStockOut(row.productId);
+  }
   revalidatePath("/dashboard/panen");
   revalidatePath("/katalog");
 }
@@ -128,6 +135,11 @@ export async function deleteHarvest(formData: FormData): Promise<void> {
 
   await db.delete(harvests).where(eq(harvests.id, id));
   await recomputeProductPrice(row.productId);
+  // Panen dihapus bisa membuat stok habis -> peringatkan pengurus.
+  const stockNow = await getAvailableStock([row.productId]);
+  if ((stockNow.get(row.productId)?.available ?? 0) <= 0) {
+    await notifyStockOut(row.productId);
+  }
   revalidatePath("/dashboard/panen");
   revalidatePath("/katalog");
 }

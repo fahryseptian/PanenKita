@@ -185,7 +185,8 @@ export async function getLaporanPeriode(
   const perProduk = [...productMap.values()].sort((a, b) => b.revenue - a.revenue || b.qtyHarvested - a.qtyHarvested);
 
   // ---- Per anggota: kontribusi panen ----
-  const feeSummary = await getKwtFeeSummary(kwtId);
+  // Fee hanya dari pesanan periode ini (createdAt fee = waktu pesanan terbayar).
+  const feeSummary = await getKwtFeeSummary(kwtId, { from, to });
 
   const memberRows = await db
     .select({

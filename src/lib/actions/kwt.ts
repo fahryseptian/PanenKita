@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { kwtMembers, kwts, pricingRules, products } from "@/lib/db/schema";
-import { ACTIVE_KWT_COOKIE, requireSession } from "@/lib/session";
+import { ACTIVE_KWT_COOKIE, requireAdmin, requireSession } from "@/lib/session";
 import { kwtRegistrationSchema } from "@/lib/validation";
 
 function slugify(text: string): string {
@@ -104,6 +104,74 @@ export async function createKwt(formData: FormData): Promise<void> {
   revalidatePath("/katalog");
   revalidatePath("/dashboard");
   redirect("/dashboard?baru=1");
+}
+
+/**
+ * Perbarui profil KWT (nama, alamat, wilayah) — hanya ketua.
+ * Slug ikut disesuaikan bila nama berubah (tetap unik global).
+ */
+export async function updateKwtProfile(formData: FormData): Promise<void> {
+  const session = await requireSession();
+  const kwtId = String(formData.get("kwtId") ?? "");
+  if (!kwtId) return;
+
+  // Hanya ketua KWT terkait yang boleh mengubah profil.
+  const [membership] = await db
+    .select({ role: kwtMembers.role })
+    .from(kwtMembers)
+    .where(and(eq(kwtMembers.kwtId, kwtId), eq(kwtMembers.userId, session.user.id)))
+    .limit(1);
+  if (membership?.role !== "ketua") return;
+
+  const parsed = kwtRegistrationSchema.safeParse({
+    name: formData.get("name"),
+    regency: formData.get("regency"),
+    province: formData.get("province") || undefined,
+    address: formData.get("address") || undefined,
+  });
+  if (!parsed.success) {
+    redirect(
+      `/dashboard/pengaturan?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Data tidak valid")}`,
+    );
+  }
+  const input = parsed.data!;
+
+  // Slug unik global; jika tabrakan, tambahkan akhiran -2, -3, ...
+  let slug = slugify(input.name);
+  for (let i = 2; i < 50; i++) {
+    const [taken] = await db
+      .select({ id: kwts.id })
+      .from(kwts)
+      .where(eq(kwts.slug, slug))
+      .limit(1);
+    if (!taken || taken.id === kwtId) break;
+    slug = `${slugify(input.name)}-${i}`;
+  }
+
+  await db
+    .update(kwts)
+    .set({
+      name: input.name,
+      slug,
+      regency: input.regency,
+      province: input.province || null,
+      address: input.address || null,
+    })
+    .where(eq(kwts.id, kwtId));
+
+  revalidatePath("/katalog");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/pengaturan");
+  redirect("/dashboard/pengaturan?sukses=1");
+}
+
+/** Putar kode undangan KWT (admin) — kode lama tidak berlaku lagi. */
+export async function rotateInviteCode(): Promise<void> {
+  const ctx = await requireAdmin();
+  const code = randomCode("KWT");
+  await db.update(kwts).set({ inviteCode: code }).where(eq(kwts.id, ctx.kwtId));
+  revalidatePath("/dashboard/pengaturan");
+  revalidatePath("/dashboard/anggota");
 }
 
 /** Gabung ke KWT via kode undangan — multi-keanggotaan, tidak menimpa yang lain. */

@@ -1,6 +1,7 @@
 import { and, count, eq, ilike, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { kwtMembers, kwts, products } from "@/lib/db/schema";
+import { getAvailableStock } from "./stock";
 import { canonicalCategory, type ProductCategory } from "./categories";
 
 export interface DirectoryRow {
@@ -12,6 +13,8 @@ export interface DirectoryRow {
   address: string | null;
   productCount: number;
   memberCount: number;
+  /** Jumlah produk aktif yang benar-benar punya stok tersedia (> 0). */
+  availableProducts: number;
 }
 
 export interface DirectoryFilter {
@@ -76,6 +79,19 @@ export async function getDirectory(
   }
   const memberMap = new Map(memberCounts.map((r) => [r.kwtId, Number(r.n)]));
 
+  // Stok tersedia per produk aktif — untuk chip "X tersedia" dan filter "Hanya tersedia".
+  const activeProducts = await db
+    .select({ id: products.id, kwtId: products.kwtId })
+    .from(products)
+    .where(eq(products.isActive, true));
+  const stock = await getAvailableStock(activeProducts.map((p) => p.id));
+  const availableByKwt = new Map<string, number>();
+  for (const p of activeProducts) {
+    if ((stock.get(p.id)?.available ?? 0) > 0) {
+      availableByKwt.set(p.kwtId, (availableByKwt.get(p.kwtId) ?? 0) + 1);
+    }
+  }
+
   // Dengan filter kategori, KWT tanpa produk yang cocok disembunyikan.
   const visible = wanted ? groups.filter((k) => (productMap.get(k.id) ?? 0) > 0) : groups;
 
@@ -83,6 +99,7 @@ export async function getDirectory(
     ...k,
     productCount: productMap.get(k.id) ?? 0,
     memberCount: memberMap.get(k.id) ?? 0,
+    availableProducts: availableByKwt.get(k.id) ?? 0,
   }));
 }
 

@@ -1,11 +1,11 @@
 /**
- * Seed data contoh untuk pilot PanenKita.
+ * Seed data contoh untuk pilot TaniKita.
  * Jalankan: npm run db:seed (butuh "db:seed" di package.json scripts)
  *
  * Akun demo:
- *   ketua@panenkita.id      / panenkita123  (ketua)
- *   bendahara@panenkita.id  / panenkita123  (bendahara)
- *   anggota@panenkita.id    / panenkita123  (anggota)
+ *   ketua@tanikita.id      / tanikita123  (ketua)
+ *   bendahara@tanikita.id  / tanikita123  (bendahara)
+ *   anggota@tanikita.id    / tanikita123  (anggota)
  */
 
 import "dotenv/config";
@@ -22,7 +22,7 @@ import {
   user,
 } from "../lib/db/schema";
 
-const DEMO_PASSWORD = "panenkita123";
+const DEMO_PASSWORD = "tanikita123";
 
 async function upsertUser(opts: {
   name: string;
@@ -71,7 +71,7 @@ async function upsertUser(opts: {
 }
 
 async function main() {
-  console.log("Seeding PanenKita...");
+  console.log("Seeding TaniKita...");
 
   // 1. Dua KWT (demo multi-kelompok untuk skala nasional)
   let [kwt] = await db.select().from(kwts).where(eq(kwts.slug, "mekar-sari")).limit(1);
@@ -111,21 +111,21 @@ async function main() {
   // 2. Pengguna
   const ketuaId = await upsertUser({
     name: "Ibu Ketua",
-    email: "ketua@panenkita.id",
+    email: "ketua@tanikita.id",
     phone: "6281234567890",
     role: "ketua",
     kwtId: kwt.id,
   });
   await upsertUser({
     name: "Ibu Bendahara",
-    email: "bendahara@panenkita.id",
+    email: "bendahara@tanikita.id",
     phone: "6281234567891",
     role: "bendahara",
     kwtId: kwt.id,
   });
   const anggotaId = await upsertUser({
     name: "Ibu Anggota",
-    email: "anggota@panenkita.id",
+    email: "anggota@tanikita.id",
     phone: "6281234567892",
     role: "anggota",
     kwtId: kwt.id,
@@ -133,14 +133,14 @@ async function main() {
   // Ketua KWT 2; Ibu Ketua juga ikut sebagai anggota di KWT 2 (demo multi-kelompok)
   const ratnaId = await upsertUser({
     name: "Ibu Ratna",
-    email: "ratna@panenkita.id",
+    email: "ratna@tanikita.id",
     phone: "6281234567893",
     role: "ketua",
     kwtId: kwt2.id,
   });
   await upsertUser({
     name: "Ibu Ketua",
-    email: "ketua@panenkita.id",
+    email: "ketua@tanikita.id",
     phone: "6281234567890",
     role: "anggota",
     kwtId: kwt2.id,
@@ -251,7 +251,7 @@ async function main() {
     console.log(`Panen KWT 2: ${rows2.length} catatan`);
   }
 
-  console.log("Selesai ✔  Login: ketua@panenkita.id / panenkita123 (KWT 1) atau ratna@panenkita.id / panenkita123 (KWT 2)");
+  console.log("Selesai ✔  Login: ketua@tanikita.id / tanikita123 (KWT 1) atau ratna@tanikita.id / tanikita123 (KWT 2)");
   process.exit(0);
 }
 

@@ -3,19 +3,44 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { kwtMembers, orderItems, orders, products, user } from "@/lib/db/schema";
+import { kwtMembers, kwts, orderItems, orders, products, user } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/session";
-import { orderInputSchema } from "@/lib/validation";
+import { ORDER_PENDING_HOURS, orderInputSchema } from "@/lib/validation";
 import { recomputeProductPrice } from "@/lib/pricing-db";
 import { getAvailableStock } from "@/lib/stock";
-import { sendWa, newOrderMessage, orderPaidMessage } from "@/lib/wa";
+import { sendWa, newOrderMessage, orderPaidMessage, orderConfirmMessage } from "@/lib/wa";
 import { formatRupiah } from "@/lib/format";
 import { recordPlatformFee } from "@/lib/fees-db";
+import { notifyStockOut } from "@/lib/stock-alerts";
+import { isMidtransEnabled } from "@/lib/midtrans";
+import { appUrl } from "@/lib/app-url";
 import { wholesaleLineTotal, activeTier } from "@/lib/wholesale";
 import { pricingRules } from "@/lib/db/schema";
 import type { WholesaleTier } from "@/lib/wholesale";
 
 const ORDER_STATUSES = ["paid", "processing", "completed", "cancelled"] as const;
+
+/** Format rincian pesanan untuk pesan WA (dipakai admin & pembeli). */
+function waSummary(
+  lines: Array<{ name: string; quantity: number; unit: string; unitPrice: number }>,
+): string {
+  return lines
+    .map(
+      (l) =>
+        `• ${l.name} × ${l.quantity} ${l.unit} @${formatRupiah(l.unitPrice)}`,
+    )
+    .join("\n");
+}
+
+/** Slug KWT untuk link halaman pesanan pada pesan pembeli. */
+async function slugOf(kwtId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ slug: kwts.slug })
+    .from(kwts)
+    .where(eq(kwts.id, kwtId))
+    .limit(1);
+  return row?.slug ?? null;
+}
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 function generateOrderNumber(): string {
@@ -100,6 +125,8 @@ export async function placeOrder(
   );
 
   const orderNumber = generateOrderNumber();
+  // Batas waktu pembayaran: stok otomatis bebas setelah lewat (lihat stock.ts).
+  const expiresAt = new Date(Date.now() + ORDER_PENDING_HOURS * 3_600_000);
   const [order] = await db
     .insert(orders)
     .values({
@@ -110,6 +137,7 @@ export async function placeOrder(
       note: parsed.data.note || null,
       status: "pending",
       total,
+      expiresAt,
     })
     .returning();
   if (!order) return { ok: false, error: "Gagal membuat pesanan" };
@@ -124,16 +152,43 @@ export async function placeOrder(
     })),
   );
 
-  // Pricing engine: pesanan baru = sinyal permintaan
+  // Pricing engine: pesanan baru = sinyal permintaan + cek stok habis
   await Promise.allSettled(lines.map((l) => recomputeProductPrice(l.product.id)));
+  const stockAfterOrder = await getAvailableStock([...byId.keys()]);
+  await Promise.allSettled(
+    lines
+      .filter((l) => (stockAfterOrder.get(l.product.id)?.available ?? 0) <= 0)
+      .map((l) => notifyStockOut(l.product.id)),
+  );
+
+  const summary = waSummary(
+    lines.map((l) => ({
+      name: (l.product as typeof productRows[number]).name,
+      quantity: l.quantity,
+      unit: (l.product as typeof productRows[number]).unit,
+      unitPrice: l.unitPrice,
+    })),
+  );
+
+  // Struk awal ke pembeli (best-effort) + link bayar bila Midtrans aktif.
+  const payUrl = isMidtransEnabled()
+    ? `${appUrl()}/katalog/${slugOf(kwtId) ?? ""}/pesan/${order.id}`
+    : null;
+  await sendWa(
+    "order_created",
+    kwtId,
+    { phone: parsed.data.buyerPhone, name: parsed.data.buyerName },
+    orderConfirmMessage({
+      orderNumber,
+      buyerName: parsed.data.buyerName,
+      summary,
+      total,
+      payUrl,
+      expiresAt,
+    }),
+  );
 
   // Notifikasi admin: pesanan baru (best-effort)
-  const summary = lines
-    .map(
-      (l) =>
-        `• ${(l.product as typeof productRows[number]).name} × ${l.quantity} ${(l.product as typeof productRows[number]).unit} @${formatRupiah(l.unitPrice)}`,
-    )
-    .join("\n");
   const admins = await db
     .select({ phone: user.phone, name: user.name })
     .from(kwtMembers)
@@ -186,6 +241,10 @@ export async function updateOrderStatus(formData: FormData): Promise<void> {
     patch.paymentSettledAt = new Date();
     await recordPlatformFee({ id: order.id, kwtId: order.kwtId, total: order.total });
   }
+  if (status === "paid") {
+    // Pesanan kembali hidup: hapus batas waktu supaya cron tidak menyentuhnya.
+    patch.expiresAt = null;
+  }
   await db.update(orders).set(patch).where(eq(orders.id, orderId));
 
   revalidatePath("/dashboard/pesanan");
@@ -208,7 +267,7 @@ export async function confirmPayment(formData: FormData): Promise<void> {
 
   await db
     .update(orders)
-    .set({ status: "paid", paymentSettledAt: new Date() })
+    .set({ status: "paid", paymentSettledAt: new Date(), expiresAt: null })
     .where(eq(orders.id, orderId));
   await recordPlatformFee({ id: order.id, kwtId: ctx.kwtId, total: order.total });
 

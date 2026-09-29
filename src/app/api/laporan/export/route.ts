@@ -57,7 +57,7 @@ export async function GET(req: Request) {
 
   const csv = [
     toCsv(
-      ["Laporan Bendahara PanenKita"],
+      ["Laporan Bendahara TaniKita"],
       [[`Periode: ${labelDari} s.d. ${labelSampai}`]],
     ),
     toCsv(

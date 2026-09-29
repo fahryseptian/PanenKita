@@ -61,7 +61,7 @@ export default async function ProvinceDirectoryPage({ params }: Props) {
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
               🌾
             </span>
-            <span className="font-bold">PanenKita</span>
+            <span className="font-bold">TaniKita</span>
           </Link>
           <Link
             href="/login"
@@ -162,7 +162,7 @@ export default async function ProvinceDirectoryPage({ params }: Props) {
       </main>
 
       <footer className="border-t border-slate-100 py-6 text-center text-xs text-slate-400">
-        Ditenagai PanenKita 🌾
+        Ditenagai TaniKita 🌾
       </footer>
     </div>
   );

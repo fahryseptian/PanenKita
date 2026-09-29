@@ -8,6 +8,7 @@ import {
   Sprout,
   TrendingUp,
   FileBarChart,
+  Settings,
   Users,
   Wallet,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const NAV: NavItem[] = [
   { href: "/dashboard/produk", label: "Produk", icon: Leaf, adminOnly: true },
   { href: "/dashboard/harga", label: "Harga", icon: TrendingUp, adminOnly: true },
   { href: "/dashboard/anggota", label: "Anggota", icon: Users, adminOnly: true },
+  { href: "/dashboard/pengaturan", label: "Pengaturan", icon: Settings, adminOnly: true },
   { href: "/dashboard/profil", label: "Profil WA", icon: Wallet },
   { href: "/dashboard/panduan", label: "Panduan", icon: BookOpen },
 ];

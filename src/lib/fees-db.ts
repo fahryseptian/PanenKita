@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { kwtCommissionSettings, platformFees } from "@/lib/db/schema";
 import {
@@ -53,8 +53,16 @@ export async function recordPlatformFee(order: {
     .onConflictDoNothing();
 }
 
-/** Rekap fee KWT untuk laporan bendahara. */
-export async function getKwtFeeSummary(kwtId: string) {
+/**
+ * Rekap fee KWT untuk laporan bendahara.
+ * @param range opsional — bila diisi, hanya fee dari pesanan yang tercatat
+ *        pada periode [from, to) yang dijumlahkan (batas atas eksklusif,
+ *        konsisten dengan getLaporanPeriode).
+ */
+export async function getKwtFeeSummary(
+  kwtId: string,
+  range?: { from: Date; to: Date },
+) {
   const rows = await db
     .select({
       orderTotal: platformFees.orderTotal,
@@ -64,7 +72,15 @@ export async function getKwtFeeSummary(kwtId: string) {
       netToKwt: platformFees.netToKwt,
     })
     .from(platformFees)
-    .where(eq(platformFees.kwtId, kwtId));
+    .where(
+      range
+        ? and(
+            eq(platformFees.kwtId, kwtId),
+            gte(platformFees.createdAt, range.from),
+            lt(platformFees.createdAt, range.to),
+          )
+        : eq(platformFees.kwtId, kwtId),
+    );
 
   const sum = (pick: (r: (typeof rows)[number]) => number) =>
     rows.reduce((acc, r) => acc + pick(r), 0);

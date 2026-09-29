@@ -26,11 +26,19 @@ export default async function HarvestPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">Catat Panen</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Setiap panen yang dicatat langsung menambah stok katalog dan menyesuaikan harga otomatis.
-        </p>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Catat Panen</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Setiap panen yang dicatat langsung menambah stok katalog dan menyesuaikan harga otomatis.
+          </p>
+        </div>
+        <a
+          href="/api/data/export?jenis=panen"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-brand-50 hover:text-brand-700"
+        >
+          Ekspor CSV
+        </a>
       </header>
 
       <HarvestForm products={productRows.map((p) => ({ ...p }))} />

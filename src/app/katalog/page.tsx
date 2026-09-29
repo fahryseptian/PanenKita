@@ -5,11 +5,14 @@ import {
   getDirectoryFacets,
   getPlatformStats,
 } from "@/lib/queries-directory";
+import { getRecentProducts } from "@/lib/queries";
 import {
   PRODUCT_CATEGORIES,
   categoryLabel,
   parseCategoryParam,
 } from "@/lib/categories";
+import { formatRupiah } from "@/lib/format";
+import { photoSrc } from "@/lib/photo-url";
 import { GroupCard, ProvinceChip } from "./group-card";
 
 export const dynamic = "force-dynamic";
@@ -24,15 +27,24 @@ export default async function KatalogIndexPage({
     provinsi?: string;
     kabupaten?: string;
     kategori?: string;
+    tersedia?: string;
   }>;
 }) {
-  const { q, provinsi, kabupaten, kategori: kategoriParam } = await searchParams;
+  const { q, provinsi, kabupaten, kategori: kategoriParam, tersedia } =
+    await searchParams;
   const kategori = parseCategoryParam(kategoriParam);
-  const filter = { q, province: provinsi, regency: kabupaten, category: kategori ?? undefined };
-  const [groups, facets, stats] = await Promise.all([
+  const onlyAvailable = tersedia === "1";
+  const filter = {
+    q,
+    province: provinsi,
+    regency: kabupaten,
+    category: kategori ?? undefined,
+  };
+  const [groups, facets, stats, recent] = await Promise.all([
     getDirectory(filter),
     getDirectoryFacets(),
     getPlatformStats(),
+    getRecentProducts(8),
   ]);
 
   // Query string helper: mempertahankan filter lain saat toggle satu chip.
@@ -44,11 +56,18 @@ export default async function KatalogIndexPage({
     return s ? `?${s}` : "";
   };
 
+  const availableQs = onlyAvailable
+    ? qs({ tersedia: undefined })
+    : qs({ tersedia: "1" });
+
   // Kabupaten yang tersedia mengikuti provinsi terpilih (atau semua).
   const regencyOptions = facets.regencies.filter(
     (r) => !provinsi || r.province === provinsi,
   );
   const hasRegionFilter = Boolean(provinsi || kabupaten);
+  const shownGroups = onlyAvailable
+    ? groups.filter((g) => g.availableProducts > 0)
+    : groups;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -57,7 +76,7 @@ export default async function KatalogIndexPage({
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
             <Leaf className="h-4 w-4" />
           </span>
-          <span className="font-bold">PanenKita</span>
+          <span className="font-bold">TaniKita</span>
           <Link
             href="/login"
             className="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
@@ -100,6 +119,9 @@ export default async function KatalogIndexPage({
           {provinsi && <input type="hidden" name="provinsi" value={provinsi} />}
           {kabupaten && <input type="hidden" name="kabupaten" value={kabupaten} />}
           {kategori && <input type="hidden" name="kategori" value={kategori} />}
+          {onlyAvailable && (
+            <input type="hidden" name="tersedia" value="1" />
+          )}
           <button
             type="submit"
             className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
@@ -132,6 +154,16 @@ export default async function KatalogIndexPage({
                 </Link>
               );
             })}
+            <Link
+              href={`/katalog${availableQs}`}
+              className={`ml-2 rounded-full px-3 py-1 text-xs font-medium transition ${
+                onlyAvailable
+                  ? "bg-brand-600 text-white"
+                  : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
+              }`}
+            >
+              Hanya tersedia
+            </Link>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -175,27 +207,79 @@ export default async function KatalogIndexPage({
               })}
             </div>
           )}
-          {(hasRegionFilter || kategori) && (
+          {(hasRegionFilter || kategori || onlyAvailable) && (
             <Link
               href={`/katalog${qs({
                 provinsi: undefined,
                 kabupaten: undefined,
                 kategori: undefined,
+                tersedia: undefined,
               })}`}
               className="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-600"
             >
-              <X className="h-3 w-3" /> Hapus filter daerah
+              <X className="h-3 w-3" /> Hapus semua filter
             </Link>
           )}
         </div>
 
-        {groups.length === 0 ? (
+        {/* Produk terbaru dengan status stok */}
+        {recent.length > 0 && (
+          <section className="mt-8">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+              Baru ditambahkan
+            </h2>
+            <div className="mt-3 flex gap-3 overflow-x-auto pb-2">
+              {recent.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/katalog/${p.kwtSlug}`}
+                  className="w-40 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-brand-300 hover:shadow-sm"
+                >
+                  <div className="flex h-20 items-center justify-center bg-brand-50">
+                    {photoSrc(p.photoUrl) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={photoSrc(p.photoUrl)!}
+                        alt={p.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl">🥬</span>
+                    )}
+                  </div>
+                  <div className="p-2.5">
+                    <p className="truncate text-sm font-semibold">{p.name}</p>
+                    <p className="truncate text-xs text-slate-400">{p.kwtName}</p>
+                    <div className="mt-1 flex items-center justify-between gap-1">
+                      <span className="text-sm font-bold text-brand-700">
+                        {formatRupiah(p.currentPrice)}
+                      </span>
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                          p.available > 0
+                            ? "bg-brand-50 text-brand-700"
+                            : "bg-slate-100 text-slate-400"
+                        }`}
+                      >
+                        {p.available > 0 ? `Stok ${p.available}` : "Habis"}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {shownGroups.length === 0 ? (
           <p className="mt-10 rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-500">
-            Belum ada kelompok yang cocok. Coba kata kunci lain.
+            {onlyAvailable
+              ? "Tidak ada kelompok dengan stok tersedia saat ini. Coba hapus filter."
+              : "Belum ada kelompok yang cocok. Coba kata kunci lain."}
           </p>
         ) : (
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {groups.map((k) => (
+            {shownGroups.map((k) => (
               <GroupCard key={k.id} group={k} />
             ))}
           </div>

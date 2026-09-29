@@ -22,7 +22,15 @@ export default async function ProductsPage() {
             Katalog yang tampil di halaman publik {`/katalog/${ctx.kwtSlug}`}
           </p>
         </div>
-        <ProductModal />
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/data/export?jenis=produk"
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-brand-50 hover:text-brand-700"
+          >
+            Ekspor CSV
+          </a>
+          <ProductModal />
+        </div>
       </header>
 
       {items.length === 0 ? (

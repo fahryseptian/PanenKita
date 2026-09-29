@@ -10,7 +10,7 @@ export default function AuthLayout({
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white">
           <Leaf className="h-5 w-5" />
         </span>
-        PanenKita
+        TaniKita
       </Link>
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
         {children}

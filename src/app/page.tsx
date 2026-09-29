@@ -32,7 +32,7 @@ export default function HomePage() {
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white">
             <Leaf className="h-5 w-5" />
           </span>
-          PanenKita
+          TaniKita
         </span>
         <nav className="flex items-center gap-2">
           <Link
@@ -98,7 +98,7 @@ export default function HomePage() {
       </main>
 
       <footer className="border-t border-slate-100 py-8 text-center text-sm text-slate-400">
-        PanenKita — katalog panen untuk KWT 🌾
+        TaniKita — katalog panen untuk KWT 🌾
       </footer>
     </div>
   );

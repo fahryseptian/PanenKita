@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-const productName = process.env.NEXT_PUBLIC_PRODUCT_NAME ?? "PanenKita";
+const productName = process.env.NEXT_PUBLIC_PRODUCT_NAME ?? "TaniKita";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -10,6 +10,7 @@ export const metadata: Metadata = {
     default: `${productName} — Katalog panen KWT`,
     template: `%s · ${productName}`,
   },
+  manifest: "/manifest.webmanifest",
   description:
     "Platform katalog panen untuk KWT: stok & harga selalu segar, harga dinamis yang transparan, notifikasi WhatsApp instan, pembayaran digital.",
   openGraph: {
