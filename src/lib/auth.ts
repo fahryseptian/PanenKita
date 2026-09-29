@@ -11,7 +11,7 @@ export const auth = betterAuth({
   secret:
     process.env.BETTER_AUTH_SECRET ??
     // Fallback hanya untuk build/dev; WAJIB diset BETTER_AUTH_SECRET di produksi.
-    "tanikita-development-secret-change-me",
+    "panenkita-development-secret-change-me",
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,

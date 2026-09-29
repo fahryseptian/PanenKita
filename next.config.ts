@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Katalog dan dashboard harus selalu menampilkan stok/harga terbaru.
   // Next 16 menghapus `force-dynamic` global; runtime config diatur per route.
+  // Preview sandbox Freebuff di-host di subdomain *.e2b.app — izinkan HMR dev di sana.
+  allowedDevOrigins: ["3000-i6j17iex7mt7h0futpvwk.e2b.app"],
   async headers() {
     return [
       {

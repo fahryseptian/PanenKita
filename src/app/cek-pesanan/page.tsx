@@ -74,7 +74,7 @@ export default async function CekPesananPage({
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-md items-center px-4 py-4">
           <Link href="/" className="text-sm font-medium text-slate-500 hover:text-slate-700">
-            ← TaniKita
+            ← PanenKita
           </Link>
         </div>
       </header>

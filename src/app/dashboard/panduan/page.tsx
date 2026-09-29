@@ -30,7 +30,7 @@ export default async function GuidePage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Panduan & Pilot</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Cara memakai TaniKita + metrik uji coba terbatas untuk KWT Anda.
+          Cara memakai PanenKita + metrik uji coba terbatas untuk KWT Anda.
         </p>
       </header>
 

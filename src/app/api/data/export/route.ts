@@ -64,7 +64,7 @@ export async function GET(req: Request) {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${csvFilename(["notifikasi", "tanikita"])}"`,
+        "Content-Disposition": `attachment; filename="${csvFilename(["notifikasi", "panenkita"])}"`,
         "Cache-Control": "no-store",
       },
     });
@@ -100,7 +100,7 @@ export async function GET(req: Request) {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${csvFilename(["audit-harga", "tanikita"])}"`,
+        "Content-Disposition": `attachment; filename="${csvFilename(["audit-harga", "panenkita"])}"`,
         "Cache-Control": "no-store",
       },
     });
@@ -135,7 +135,7 @@ export async function GET(req: Request) {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${csvFilename(["produk", "tanikita"])}"`,
+        "Content-Disposition": `attachment; filename="${csvFilename(["produk", "panenkita"])}"`,
         "Cache-Control": "no-store",
       },
     });
@@ -188,7 +188,7 @@ export async function GET(req: Request) {
     status: 200,
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${csvFilename(["panen", "tanikita"])}"`,
+      "Content-Disposition": `attachment; filename="${csvFilename(["panen", "panenkita"])}"`,
       "Cache-Control": "no-store",
     },
   });

@@ -1,40 +1,10 @@
 import Link from "next/link";
-import {
-  BarChart3,
-  BookOpen,
-  Leaf,
-  LogOut,
-  ShoppingCart,
-  Sprout,
-  TrendingUp,
-  FileBarChart,
-  Settings,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { Leaf } from "lucide-react";
 import { requireKwtContext, getMyKwts } from "@/lib/session";
 import { SignOutButton } from "./sign-out-button";
 import { KwtSwitcher } from "./kwt-switcher";
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: typeof Leaf;
-  adminOnly?: boolean;
-}
-
-const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Ringkasan", icon: BarChart3 },
-  { href: "/dashboard/panen", label: "Panen", icon: Sprout },
-  { href: "/dashboard/pesanan", label: "Pesanan", icon: ShoppingCart },
-  { href: "/dashboard/laporan", label: "Laporan", icon: FileBarChart, adminOnly: true },
-  { href: "/dashboard/produk", label: "Produk", icon: Leaf, adminOnly: true },
-  { href: "/dashboard/harga", label: "Harga", icon: TrendingUp, adminOnly: true },
-  { href: "/dashboard/anggota", label: "Anggota", icon: Users, adminOnly: true },
-  { href: "/dashboard/pengaturan", label: "Pengaturan", icon: Settings, adminOnly: true },
-  { href: "/dashboard/profil", label: "Profil WA", icon: Wallet },
-  { href: "/dashboard/panduan", label: "Panduan", icon: BookOpen },
-];
+import { NAV } from "./nav-items";
+import { MobileMenu } from "./mobile-menu";
 
 export default async function DashboardLayout({
   children,
@@ -42,6 +12,11 @@ export default async function DashboardLayout({
   const ctx = await requireKwtContext();
   const memberships = await getMyKwts(ctx.userId);
   const items = NAV.filter((n) => !n.adminOnly || ctx.isAdmin);
+  const membershipsLite = memberships.map((m) => ({
+    kwtId: m.kwtId,
+    kwtName: m.kwtName,
+    role: m.role,
+  }));
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -66,20 +41,40 @@ export default async function DashboardLayout({
           ))}
         </nav>
         <div className="border-t border-slate-100 p-4">
-          <KwtSwitcher
-            current={ctx.kwtId}
-            memberships={memberships.map((m) => ({ kwtId: m.kwtId, kwtName: m.kwtName, role: m.role }))}
-          />
+          <KwtSwitcher current={ctx.kwtId} memberships={membershipsLite} />
           <p className="mt-3 truncate text-sm font-medium">{ctx.userName}</p>
           <p className="text-xs capitalize text-brand-600">{ctx.role}</p>
           <SignOutButton />
         </div>
       </aside>
 
-      {/* Konten */}
-      <main className="flex-1 overflow-x-hidden p-4 pb-24 md:p-8 md:pb-8">{children}</main>
+      {/* Kolom utama */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Header mobile: brand + menu lengkap */}
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-4 md:hidden">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white">
+            <Leaf className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+            {ctx.kwtName}
+          </span>
+          <MobileMenu
+            isAdmin={ctx.isAdmin}
+            kwtId={ctx.kwtId}
+            kwtName={ctx.kwtName}
+            userName={ctx.userName}
+            role={ctx.role}
+            memberships={membershipsLite}
+          />
+        </header>
 
-      {/* Bottom nav mobile */}
+        {/* Konten */}
+        <main className="flex-1 overflow-x-hidden p-4 pb-24 md:p-8 md:pb-8">
+          {children}
+        </main>
+      </div>
+
+      {/* Bottom nav mobile: pintasan 5 halaman teratas */}
       <nav className="fixed inset-x-0 bottom-0 z-20 flex justify-around border-t border-slate-200 bg-white py-2 md:hidden">
         {items.slice(0, 5).map((item) => (
           <Link
@@ -92,9 +87,6 @@ export default async function DashboardLayout({
           </Link>
         ))}
       </nav>
-      <span className="sr-only">
-        <LogOut className="hidden" />
-      </span>
     </div>
   );
 }

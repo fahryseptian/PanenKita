@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-const productName = process.env.NEXT_PUBLIC_PRODUCT_NAME ?? "TaniKita";
+const productName = process.env.NEXT_PUBLIC_PRODUCT_NAME ?? "PanenKita";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -28,7 +30,11 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="id">
-      <body className="min-h-screen bg-white text-slate-900">{children}</body>
+      <body className="min-h-screen bg-white text-slate-900">
+        {children}
+        <Analytics />
+        <SpeedInsights />
+      </body>
     </html>
   );
 }

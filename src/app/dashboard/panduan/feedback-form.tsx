@@ -43,7 +43,7 @@ export function FeedbackForm() {
         name="message"
         required
         rows={3}
-        placeholder="Bagikan pengalaman Anda memakai TaniKita..."
+        placeholder="Bagikan pengalaman Anda memakai PanenKita..."
         className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
       />
       {msg && (

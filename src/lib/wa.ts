@@ -136,7 +136,7 @@ export function newOrderMessage(opts: {
     ``,
     `Total: *${formatRupiah(opts.total)}*`,
     ``,
-    `Konfirmasi & atur status di dashboard TaniKita.`,
+    `Konfirmasi & atur status di dashboard PanenKita.`,
   ].join("\n");
 }
 
@@ -239,10 +239,10 @@ export function broadcastMessage(opts: {
     ``,
     opts.text,
     ``,
-    `— dikirim via TaniKita`,
+    `— dikirim via PanenKita`,
   ].join("\n");
 }
 
 export function testMessage(name: string): string {
-  return `👋 Halo ${name}! Ini pesan uji dari TaniKita. Jika Anda menerima ini, notifikasi WhatsApp berfungsi normal. 🌾`;
+  return `👋 Halo ${name}! Ini pesan uji dari PanenKita. Jika Anda menerima ini, notifikasi WhatsApp berfungsi normal. 🌾`;
 }
