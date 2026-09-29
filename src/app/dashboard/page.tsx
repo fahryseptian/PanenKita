@@ -16,6 +16,7 @@ import { getHarvestForecast } from "@/lib/queries-forecast";
 import { formatRupiah, formatDateTime, formatQuantity, timeAgo } from "@/lib/format";
 import { after } from "next/server";
 import { expireStaleOrders } from "@/lib/order-expiry";
+import { runDueHarvestSchedules } from "@/lib/harvest-schedule-runner";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function DashboardPage() {
   after(async () => {
     try {
       await expireStaleOrders();
+      await runDueHarvestSchedules(new Date().getUTCDay());
     } catch (err) {
       console.error("[orders-expiry] lazy run failed", err);
     }

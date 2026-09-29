@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { expireStaleOrders } from "@/lib/order-expiry";
+import { runDueHarvestSchedules } from "@/lib/harvest-schedule-runner";
 
 export const dynamic = "force-dynamic";
 
@@ -25,5 +26,12 @@ export async function GET(req: Request) {
   }
 
   const result = await expireStaleOrders();
-  return NextResponse.json({ ok: true, ...result });
+  // Piggyback: jadwal panen berulang ikut jalan tiap tick cron/lazy ini.
+  const schedule = await runDueHarvestSchedules(new Date().getUTCDay()).catch(
+    (err) => {
+      console.error("[orders-expire] schedule run failed", err);
+      return { executed: 0, notified: 0 };
+    },
+  );
+  return NextResponse.json({ ok: true, ...result, ...schedule });
 }

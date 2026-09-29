@@ -213,6 +213,20 @@ export function stockOutMessage(opts: {
   ].join("\n");
 }
 
+/** Notifikasi ke pengurus: panen otomatis dijalankan dari jadwal. */
+export function scheduledHarvestMessage(opts: {
+  productName: string;
+  quantity: string;
+  unit: string;
+}): string {
+  return [
+    `🌱 *Panen otomatis dijalankan*`,
+    ``,
+    `${opts.productName}: +${opts.quantity} ${opts.unit} (dari jadwal panen berulang)`,
+    `Stok katalog sudah bertambah dan harga menyesuaikan otomatis.`,
+  ].join("\n");
+}
+
 /** Pesan broadcast pengumuman ke anggota/pengurus KWT. */
 export function broadcastMessage(opts: {
   kwtName: string;

@@ -37,6 +37,38 @@ export const orderStatusEnum = pgEnum("order_status", [
   "cancelled",
   "expired",
 ]);
+
+export const harvestSchedules = pgTable(
+  "harvest_schedules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kwtId: uuid("kwt_id")
+      .notNull()
+      .references(() => kwts.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    /** Anggota pelaksana panen (pencatat di riwayat) */
+    memberId: text("member_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** Jumlah panen per kejadian (satuan produk) */
+    quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
+    /** Kualitas panen otomatis: A | B | C */
+    quality: text("quality").notNull().default("A"),
+    /** 0=Minggu .. 6=Sabtu (getDay) */
+    dayOfWeek: integer("day_of_week").notNull(),
+    /** true = aktif; false = pause sementara tanpa hapus jadwal */
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    // Idempotensi runner: satu panen otomatis per produk per hari.
+    uniqueIndex("harvest_schedule_day_key").on(t.productId, t.dayOfWeek),
+  ],
+);
 export const pricingEventTypeEnum = pgEnum("pricing_event_type", [
   "recompute",
   "manual",

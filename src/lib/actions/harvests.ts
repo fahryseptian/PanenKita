@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { harvests, kwtMembers, products, user } from "@/lib/db/schema";
+import { harvestSchedules, harvests, kwtMembers, products, user } from "@/lib/db/schema";
 import { getAvailableStock } from "@/lib/stock";
 import { requireKwtContext } from "@/lib/session";
 import { harvestInputSchema } from "@/lib/validation";
@@ -73,6 +73,92 @@ export async function recordHarvest(formData: FormData): Promise<void> {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/panen");
   revalidatePath("/katalog");
+}
+
+/**
+ * Buat jadwal panen berulang: stok produk terisi otomatis tiap hari terpilih.
+ * Satu jadwal per produk per hari (unik di DB). Admin saja.
+ */
+export async function createHarvestSchedule(formData: FormData): Promise<void> {
+  const ctx = await requireKwtContext();
+  if (!ctx.isAdmin) return;
+  const productId = String(formData.get("productId") ?? "");
+  const memberId = String(formData.get("memberId") ?? ctx.userId);
+  const dayOfWeek = Number(formData.get("dayOfWeek"));
+  const quantity = Number(formData.get("quantity"));
+  const quality = String(formData.get("quality") ?? "A");
+  if (
+    !productId ||
+    !Number.isInteger(dayOfWeek) ||
+    dayOfWeek < 0 ||
+    dayOfWeek > 6 ||
+    !Number.isFinite(quantity) ||
+    quantity <= 0 ||
+    !["A", "B", "C"].includes(quality)
+  ) {
+    return;
+  }
+
+  const [product] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.kwtId, ctx.kwtId)))
+    .limit(1);
+  if (!product) return;
+
+  // Anggota pelaksana harus anggota KWT ini.
+  const [member] = await db
+    .select({ userId: kwtMembers.userId })
+    .from(kwtMembers)
+    .where(and(eq(kwtMembers.kwtId, ctx.kwtId), eq(kwtMembers.userId, memberId)))
+    .limit(1);
+  if (!member) return;
+
+  await db
+    .insert(harvestSchedules)
+    .values({
+      kwtId: ctx.kwtId,
+      productId,
+      memberId,
+      quantity: String(quantity),
+      quality,
+      dayOfWeek,
+    })
+    .onConflictDoNothing(); // (product_id, day_of_week) sudah ada -> abaikan
+
+  revalidatePath("/dashboard/panen");
+}
+
+/** Aktifkan/pause jadwal tanpa menghapusnya. */
+export async function toggleHarvestSchedule(formData: FormData): Promise<void> {
+  const ctx = await requireKwtContext();
+  if (!ctx.isAdmin) return;
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const [row] = await db
+    .select({ isActive: harvestSchedules.isActive })
+    .from(harvestSchedules)
+    .where(and(eq(harvestSchedules.id, id), eq(harvestSchedules.kwtId, ctx.kwtId)))
+    .limit(1);
+  if (!row) return;
+
+  await db
+    .update(harvestSchedules)
+    .set({ isActive: !row.isActive })
+    .where(eq(harvestSchedules.id, id));
+  revalidatePath("/dashboard/panen");
+}
+
+export async function deleteHarvestSchedule(formData: FormData): Promise<void> {
+  const ctx = await requireKwtContext();
+  if (!ctx.isAdmin) return;
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await db
+    .delete(harvestSchedules)
+    .where(and(eq(harvestSchedules.id, id), eq(harvestSchedules.kwtId, ctx.kwtId)));
+  revalidatePath("/dashboard/panen");
 }
 
 /**

@@ -33,7 +33,7 @@ export async function expireStaleOrders(): Promise<ExpireResult> {
     const updated = await db
       .update(orders)
       .set({ status: "expired" })
-        .where(and(eq(orders.id, order.id), eq(orders.status, "pending")))
+      .where(and(eq(orders.id, order.id), eq(orders.status, "pending")))
       .returning({ id: orders.id });
     if (updated.length === 0) continue;
     expired += 1;
