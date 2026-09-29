@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/orders/expire",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }

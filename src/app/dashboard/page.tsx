@@ -14,12 +14,24 @@ import {
 } from "@/lib/queries";
 import { getHarvestForecast } from "@/lib/queries-forecast";
 import { formatRupiah, formatDateTime, formatQuantity, timeAgo } from "@/lib/format";
+import { after } from "next/server";
+import { expireStaleOrders } from "@/lib/order-expiry";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Ringkasan" };
 
 export default async function DashboardPage() {
+  // Plan Hobby Vercel tak mendukung cron sub-harian: kedaluwarsa dijalankan lazy
+  // setiap dashboard dibuka (non-blocking), cron harian tetap sebagai cadangan.
+  after(async () => {
+    try {
+      await expireStaleOrders();
+    } catch (err) {
+      console.error("[orders-expiry] lazy run failed", err);
+    }
+  });
+
   const ctx = await requireKwtContext();
   const [overview, recentHarvests, recentOrders, forecast] = await Promise.all([
     getDashboardOverview(ctx.kwtId),
