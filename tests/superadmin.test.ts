@@ -13,8 +13,11 @@ describe("platform role (superadmin)", () => {
     expect(schema).toMatch(/role: userRoleEnum\("role"\)\.notNull\(\)\.default\("user"\)/);
   });
 
-  it("adds kwt_status enum for moderation", () => {
-    expect(schema).toMatch(/pgEnum\("kwt_status", \["pending", "approved", "rejected"\]\)/);
+  it("adds kwt_status enum for moderation (incl. suspend)", () => {
+    expect(schema).toContain('pgEnum("kwt_status"');
+    for (const status of ["pending", "approved", "rejected", "suspended"]) {
+      expect(schema).toContain(`"${status}"`);
+    }
   });
 
   const session = read("src/lib/session.ts");
@@ -37,12 +40,42 @@ describe("superadmin bootstrap CLI", () => {
 
   it("promotes an existing user by email", () => {
     expect(script).toContain("promote-superadmin.ts <email>");
-    expect(script).toContain('set({ role: "superadmin" })');
+    expect(script).toContain('const target: "user" | "superadmin"');
+    expect(script).toContain("set({ role: target })");
+  });
+
+  it("supports --revoke to undo a promotion", () => {
+    expect(script).toContain('flags.includes("--revoke")');
+    expect(script).toContain('revoke ? "user" : "superadmin"');
   });
 
   it("is wired as a package script", () => {
     const pkg = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
     expect(pkg.scripts["promote:superadmin"]).toContain("promote-superadmin.ts");
+  });
+});
+
+describe("superadmin entry points to /admin", () => {
+  const noKwt = read("src/app/no-kwt/page.tsx");
+
+  it("offers a panel link for superadmins without a KWT", () => {
+    expect(noKwt).toContain("getPlatformRole");
+    expect(noKwt).toContain("Buka Panel Admin");
+    expect(noKwt).toContain('href="/admin"');
+  });
+
+  it("adds a sidebar entry in the dashboard for superadmins", () => {
+    const layout = read("src/app/dashboard/layout.tsx");
+    expect(layout).toContain("getPlatformRole(ctx.userId)");
+    expect(layout).toContain('=== "superadmin"');
+    expect(layout).toContain("Panel Admin");
+    expect(layout).toContain("isSuperadmin={isSuperadmin}");
+  });
+
+  it("adds the same entry in the mobile menu", () => {
+    const menu = read("src/app/dashboard/mobile-menu.tsx");
+    expect(menu).toContain("isSuperadmin: boolean");
+    expect(menu).toContain("Panel Admin");
   });
 });
 

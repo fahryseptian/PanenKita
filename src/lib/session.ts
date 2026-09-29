@@ -7,6 +7,13 @@ import { kwtMembers, kwts, user as userTable } from "@/lib/db/schema";
 
 export type MemberRole = "ketua" | "bendahara" | "anggota";
 
+/** Status moderasi KWT di level platform. */
+export type KwtModerationStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "suspended";
+
 export interface KwtContext {
   kwtId: string;
   kwtName: string;
@@ -16,8 +23,8 @@ export interface KwtContext {
   userId: string;
   userName: string;
   isAdmin: boolean; // ketua atau bendahara
-  /** Status moderasi platform: pending | approved | rejected */
-  kwtStatus: "pending" | "approved" | "rejected";
+  /** Status moderasi platform: pending | approved | rejected | suspended */
+  kwtStatus: KwtModerationStatus;
 }
 
 export interface Membership {
@@ -116,7 +123,7 @@ export async function requireKwtContext(): Promise<KwtContext> {
     isAdmin: role === "ketua" || role === "bendahara",
     userId: session.user.id,
     userName: session.user.name,
-    kwtStatus: active.kwtStatus as "pending" | "approved" | "rejected",
+    kwtStatus: active.kwtStatus as KwtModerationStatus,
   };
 }
 

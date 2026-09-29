@@ -5,13 +5,20 @@ import { user } from "../src/lib/db/schema";
 
 /**
  * Bootstrap superadmin pertama (atau tambahan).
- * Pemakaian: npx tsx scripts/promote-superadmin.ts <email>
+ * Pemakaian: npx tsx scripts/promote-superadmin.ts <email> [--revoke]
  * Akun harus sudah terdaftar via /signup. Role level platform (bukan role KWT).
+ * --revoke : turunkan kembali menjadi user biasa (pembatalan darurat).
  */
 async function main() {
-  const email = process.argv[2]?.trim().toLowerCase();
+  const [rawEmail, ...flags] = process.argv.slice(2);
+  const email = rawEmail?.trim().toLowerCase();
+  const revoke = flags.includes("--revoke");
+  const target: "user" | "superadmin" = revoke ? "user" : "superadmin";
+
   if (!email) {
-    console.error("Pemakaian: npx tsx scripts/promote-superadmin.ts <email>");
+    console.error(
+      "Pemakaian: npx tsx scripts/promote-superadmin.ts <email> [--revoke]",
+    );
     process.exit(1);
   }
 
@@ -26,13 +33,19 @@ async function main() {
     process.exit(1);
   }
 
-  if (existing.role === "superadmin") {
-    console.log(`${email} sudah menjadi superadmin.`);
+  if (existing.role === target) {
+    console.log(
+      `${email} sudah berrole ${target}.`,
+    );
     process.exit(0);
   }
 
-  await db.update(user).set({ role: "superadmin" }).where(eq(user.id, existing.id));
-  console.log(`✔ ${email} sekarang menjadi superadmin. Login lalu buka /admin.`);
+  await db.update(user).set({ role: target }).where(eq(user.id, existing.id));
+  console.log(
+    revoke
+      ? `✔ ${email} diturunkan menjadi user biasa (akses /admin dicabut).`
+      : `✔ ${email} sekarang menjadi superadmin. Login lalu buka /admin.`,
+  );
   process.exit(0);
 }
 

@@ -1,11 +1,21 @@
 "use server";
 
+import { randomBytes, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { kwts, regions, user } from "@/lib/db/schema";
+import {
+  kwtMembers,
+  kwtSettlements,
+  kwts,
+  platformFees,
+  regions,
+  user,
+  verification,
+} from "@/lib/db/schema";
 import { requireSuperadmin } from "@/lib/session";
+import { kwtApprovedMessage, kwtRejectedMessage, sendWa } from "@/lib/wa";
 import {
   WA_TOKEN_KEY,
   deleteSetting,
@@ -39,15 +49,46 @@ export async function setUserRole(formData: FormData): Promise<void> {
   revalidatePath("/admin");
 }
 
+/**
+ * Kabari pembuat KWT (ketua pertama yang punya nomor WA) tentang hasil moderasi.
+ * Kegagalan kirim tidak boleh menggagalkan aksi admin.
+ */
+async function notifyKwtCreator(
+  kwtId: string,
+  message: string,
+): Promise<void> {
+  try {
+    const [creator] = await db
+      .select({ name: user.name, phone: user.phone })
+      .from(kwtMembers)
+      .innerJoin(user, eq(user.id, kwtMembers.userId))
+      .where(and(eq(kwtMembers.kwtId, kwtId), eq(kwtMembers.role, "ketua")))
+      .limit(1);
+    if (!creator?.phone) return;
+    await sendWa(
+      "kwt_review",
+      kwtId,
+      { phone: creator.phone, name: creator.name },
+      message,
+    );
+  } catch (err) {
+    console.error("[admin] failed to notify KWT creator", err);
+  }
+}
+
 /** Setujui KWT — tampil di katalog publik & siap menerima pesanan. */
 export async function approveKwt(formData: FormData): Promise<void> {
   await requireSuperadmin();
   const kwtId = String(formData.get("kwtId") ?? "");
   if (!kwtId) return;
-  await db
+  const [kwt] = await db
     .update(kwts)
     .set({ status: "approved", approvedAt: new Date() })
-    .where(eq(kwts.id, kwtId));
+    .where(eq(kwts.id, kwtId))
+    .returning({ name: kwts.name, slug: kwts.slug });
+  if (kwt) {
+    await notifyKwtCreator(kwtId, kwtApprovedMessage({ kwtName: kwt.name, slug: kwt.slug }));
+  }
   revalidatePath("/admin/kwt");
   revalidatePath("/admin");
   revalidatePath("/katalog");
@@ -58,10 +99,14 @@ export async function rejectKwt(formData: FormData): Promise<void> {
   await requireSuperadmin();
   const kwtId = String(formData.get("kwtId") ?? "");
   if (!kwtId) return;
-  await db
+  const [kwt] = await db
     .update(kwts)
     .set({ status: "rejected", approvedAt: null })
-    .where(eq(kwts.id, kwtId));
+    .where(eq(kwts.id, kwtId))
+    .returning({ name: kwts.name });
+  if (kwt) {
+    await notifyKwtCreator(kwtId, kwtRejectedMessage({ kwtName: kwt.name }));
+  }
   revalidatePath("/admin/kwt");
   revalidatePath("/admin");
   revalidatePath("/katalog");
@@ -78,6 +123,107 @@ export async function resetKwtToPending(formData: FormData): Promise<void> {
     .where(eq(kwts.id, kwtId));
   revalidatePath("/admin/kwt");
   revalidatePath("/katalog");
+}
+
+/** Suspend sementara — sembunyikan dari katalog tanpa menghapus data. */
+export async function suspendKwt(formData: FormData): Promise<void> {
+  await requireSuperadmin();
+  const kwtId = String(formData.get("kwtId") ?? "");
+  if (!kwtId) return;
+  await db.update(kwts).set({ status: "suspended" }).where(eq(kwts.id, kwtId));
+  revalidatePath("/admin/kwt");
+  revalidatePath("/katalog");
+}
+
+/** Aktifkan kembali KWT yang disuspend (kembali approved). */
+export async function resumeKwt(formData: FormData): Promise<void> {
+  await requireSuperadmin();
+  const kwtId = String(formData.get("kwtId") ?? "");
+  if (!kwtId) return;
+  await db
+    .update(kwts)
+    .set({ status: "approved", approvedAt: new Date() })
+    .where(eq(kwts.id, kwtId));
+  revalidatePath("/admin/kwt");
+  revalidatePath("/katalog");
+}
+
+/**
+ * Buat tautan reset manual untuk pengguna yang tidak punya nomor WhatsApp.
+ * Token dibuat persis seperti alur better-auth (`reset-password:<token>` di
+ * tabel verification) sehingga endpoint /api/auth/reset-password menerimanya.
+ * Tautan hanya ditampilkan di halaman admin — kirim manual setelah verifikasi.
+ */
+export async function createResetLinkForUser(formData: FormData): Promise<void> {
+  await requireSuperadmin();
+  const userId = String(formData.get("userId") ?? "");
+  if (!userId) return;
+
+  const [target] = await db
+    .select({ email: user.email })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+  if (!target) return;
+
+  const token = randomBytes(24).toString("base64url");
+  await db.insert(verification).values({
+    id: randomUUID(),
+    identifier: `reset-password:${token}`,
+    value: userId,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+  });
+
+  revalidatePath("/admin/pengguna");
+  redirect(
+    `/admin/pengguna?resetToken=${encodeURIComponent(token)}&resetEmail=${encodeURIComponent(target.email)}`,
+  );
+}
+
+/**
+ * Catat pencairan fee platform untuk satu KWT: jumlahkan seluruh fee yang belum
+ * tercakup settlement sebelumnya, simpan baris pencairan, kembalikan rekapnya.
+ */
+export async function recordSettlement(formData: FormData): Promise<void> {
+  const session = await requireSuperadmin();
+  const kwtId = String(formData.get("kwtId") ?? "");
+  if (!kwtId) return;
+
+  const [last] = await db
+    .select({ settledThrough: kwtSettlements.settledThrough })
+    .from(kwtSettlements)
+    .where(eq(kwtSettlements.kwtId, kwtId))
+    .orderBy(sql`${kwtSettlements.settledThrough} desc`)
+    .limit(1);
+
+  const conditions = [eq(platformFees.kwtId, kwtId)];
+  if (last?.settledThrough) {
+    conditions.push(gt(platformFees.createdAt, last.settledThrough));
+  }
+
+  const [agg] = await db
+    .select({
+      amount: sql<number>`coalesce(sum(${platformFees.totalFee}), 0)::int`,
+      n: count(),
+    })
+    .from(platformFees)
+    .where(and(...conditions));
+
+  const amount = Number(agg?.amount ?? 0);
+  if (amount <= 0) {
+    redirect("/admin/settlement?error=Tidak+ada+fee+belum+tercairkan");
+  }
+
+  await db.insert(kwtSettlements).values({
+    kwtId,
+    amount,
+    settledThrough: new Date(),
+    feeCount: Number(agg?.n ?? 0),
+    createdBy: session.user.id,
+  });
+
+  revalidatePath("/admin/settlement");
+  redirect("/admin/settlement?sukses=1");
 }
 
 /** Status token WA global untuk halaman /admin/pengaturan. */

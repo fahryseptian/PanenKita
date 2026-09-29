@@ -33,8 +33,9 @@ export default async function RegisterPage({
           <RegistrationForm />
         </div>
         <p className="mt-6 text-xs text-slate-400">
-          Setelah terdaftar, tambahkan produk & bagikan kode undangan kepada
-          anggota. Katalog publik langsung tampil di /katalog.
+          Setelah terdaftar, kelompok ditinjau admin PanenKita terlebih dahulu.
+          Anda tetap bisa langsung menambah produk & mengundang anggota — katalog
+          publik tayang setelah disetujui.
         </p>
       </div>
     </div>

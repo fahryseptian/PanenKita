@@ -25,7 +25,13 @@ export const memberRoleEnum = pgEnum("member_role", [
 /** Role level platform (terpisah dari role keanggotaan KWT). */
 export const userRoleEnum = pgEnum("user_role", ["user", "superadmin"]);
 /** Status moderasi KWT di level platform. */
-export const kwtStatusEnum = pgEnum("kwt_status", ["pending", "approved", "rejected"]);
+export const kwtStatusEnum = pgEnum("kwt_status", [
+  "pending",
+  "approved",
+  "rejected",
+  /** approved tapi disembunyikan sementara (mis. sengketa/masalah data). */
+  "suspended",
+]);
 export const qualityGradeEnum = pgEnum("quality_grade", ["A", "B", "C"]);
 /** Tujuan bagian panen yang tidak terjual: donasi / kompos / hilang. */
 export const wasteDestinationEnum = pgEnum("waste_destination", [
@@ -88,6 +94,7 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "broadcast",
   "test",
   "password_reset",
+  "kwt_review",
 ]);
 // ---------------------------------------------------------------------------
 // Better Auth tables (generated with the auth CLI, kept in our schema)
@@ -480,6 +487,32 @@ export const pricingEvents = pgTable(
       .defaultNow(),
   },
   (t) => [index("pricing_events_product_time_idx").on(t.productId, t.createdAt)],
+);
+
+/**
+ * Catatan pencairan fee platform per KWT (settlement).
+ * Fee yang belum dicairkan = platform_fees setelah settled_through terakhir.
+ */
+export const kwtSettlements = pgTable(
+  "kwt_settlements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kwtId: uuid("kwt_id")
+      .notNull()
+      .references(() => kwts.id, { onDelete: "cascade" }),
+    /** Total fee yang dicairkan pada periode ini (rupiah) */
+    amount: integer("amount").notNull(),
+    /** Batas waktu fee yang termasuk (semua fee <= settledThrough) */
+    settledThrough: timestamp("settled_through", { withTimezone: true }).notNull(),
+    /** Jumlah pesanan yang fee-nya termasuk dalam pencairan ini */
+    feeCount: integer("fee_count").notNull().default(0),
+    note: text("note"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("kwt_settlements_kwt_time_idx").on(t.kwtId, t.createdAt)],
 );
 
 /** Pengaturan aplikasi global (key-value) — mis. token WA yang diatur admin via UI. */

@@ -22,7 +22,10 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
-    router.push("/dashboard");
+    // Superadmin platform mendarat di /admin; pengguna lain di dashboard KWT.
+    const { data } = await authClient.getSession();
+    const role = (data?.user as { role?: string } | undefined)?.role;
+    router.push(role === "superadmin" ? "/admin" : "/dashboard");
     router.refresh();
   }
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Leaf } from "lucide-react";
-import { requireKwtContext, getMyKwts } from "@/lib/session";
+import { Leaf, ShieldCheck } from "lucide-react";
+import { requireKwtContext, getMyKwts, getPlatformRole } from "@/lib/session";
 import { SignOutButton } from "./sign-out-button";
 import { KwtSwitcher } from "./kwt-switcher";
 import { NAV } from "./nav-items";
@@ -12,6 +12,7 @@ export default async function DashboardLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const ctx = await requireKwtContext();
   const memberships = await getMyKwts(ctx.userId);
+  const isSuperadmin = (await getPlatformRole(ctx.userId)) === "superadmin";
   const items = NAV.filter((n) => !n.adminOnly || ctx.isAdmin);
   const membershipsLite = memberships.map((m) => ({
     kwtId: m.kwtId,
@@ -30,6 +31,15 @@ export default async function DashboardLayout({
           <span className="truncate">{ctx.kwtName}</span>
         </Link>
         <nav className="flex-1 space-y-1 p-3">
+          {isSuperadmin && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-3 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Panel Admin
+            </Link>
+          )}
           {items.map((item) => (
             <Link
               key={item.href}
@@ -67,6 +77,7 @@ export default async function DashboardLayout({
           <NotificationBell />
           <MobileMenu
             isAdmin={ctx.isAdmin}
+            isSuperadmin={isSuperadmin}
             kwtId={ctx.kwtId}
             kwtName={ctx.kwtName}
             userName={ctx.userName}
@@ -77,6 +88,27 @@ export default async function DashboardLayout({
 
         {/* Konten */}
         <main className="flex-1 overflow-x-hidden p-4 pb-24 md:p-8 md:pb-8">
+          {/* Status moderasi platform: jelaskan bila katalog belum tayang */}
+          {ctx.kwtStatus === "pending" && (
+            <div className="mx-auto mb-6 max-w-5xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <b>Menunggu persetujuan admin PanenKita.</b> Kelompok Anda sudah
+              bisa dipakai untuk mencatat panen & produk, tetapi katalognya
+              belum tayang di halaman publik.
+            </div>
+          )}
+          {ctx.kwtStatus === "rejected" && (
+            <div className="mx-auto mb-6 max-w-5xl rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <b>Pendaftaran kelompok belum disetujui.</b> Katalog tidak tayang
+              di halaman publik. Perbaiki data di Pengaturan lalu hubungi admin
+              PanenKita untuk peninjauan ulang.
+            </div>
+          )}
+          {ctx.kwtStatus === "suspended" && (
+            <div className="mx-auto mb-6 max-w-5xl rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-700">
+              <b>Katalog disembunyikan sementara oleh admin.</b> Data Anda aman;
+              hubungi admin PanenKita untuk mengaktifkan kembali.
+            </div>
+          )}
           {children}
         </main>
       </div>

@@ -19,7 +19,8 @@ export type NotificationKind =
   | "order_expired"
   | "broadcast"
   | "test"
-  | "password_reset";
+  | "password_reset"
+  | "kwt_review";
 
 export interface WaRecipient {
   /** Nomor internasional tanpa +, mis. 6281234567890 */
@@ -249,6 +250,44 @@ export function broadcastMessage(opts: {
 
 export function testMessage(name: string): string {
   return `👋 Halo ${name}! Ini pesan uji dari PanenKita. Jika Anda menerima ini, notifikasi WhatsApp berfungsi normal. 🌾`;
+}
+
+/** Kabar moderasi untuk pembuat KWT (disetujui / ditolak). */
+export function kwtApprovedMessage(opts: { kwtName: string; slug: string }): string {
+  return [
+    `✅ *Kelompok ${opts.kwtName} disetujui!*`,
+    ``,
+    `Katalog Anda sudah tayang di PanenKita:`,
+    `/katalog/${opts.slug}`,
+    ``,
+    `Langkah berikutnya: tambahkan produk, catat panen pertama, dan undang anggota lewat kode undangan di menu Anggota.`,
+  ].join("\n");
+}
+
+export function kwtRejectedMessage(opts: { kwtName: string; reason?: string }): string {
+  return [
+    `⛔ *Pendaftaran ${opts.kwtName} belum disetujui*`,
+    ``,
+    opts.reason ? `Catatan admin: ${opts.reason}` :
+      "Data kelompok belum memenuhi syarat katalog publik.",
+    ``,
+    `Perbaiki data di Pengaturan dashboard lalu hubungi admin PanenKita untuk peninjauan ulang.`,
+  ].join("\n");
+}
+
+/** Peringatan ke superadmin: ada permintaan reset tanpa nomor WhatsApp. */
+export function resetWithoutPhoneAlert(opts: {
+  userName: string;
+  userEmail: string;
+}): string {
+  return [
+    `🔑 *Permintaan reset kata sandi*`,
+    ``,
+    `${opts.userName} (${opts.userEmail}) meminta atur ulang kata sandi,`,
+    `tetapi akunnya belum punya nomor WhatsApp terdaftar sehingga tautan tidak bisa dikirim.`,
+    ``,
+    `Bantu dengan membuat tautan reset dari /admin/pengguna setelah memverifikasi identitasnya.`,
+  ].join("\n");
 }
 
 /** Tautan atur ulang kata sandi (token kedaluwarsa 1 jam). */

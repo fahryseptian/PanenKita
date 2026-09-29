@@ -61,8 +61,17 @@ npm run db:seed
 | `MIDTRANS_CLIENT_KEY` | ⬜ | Pasangan server key | Untuk Snap.js di klien |
 | `MIDTRANS_IS_PRODUCTION` | ⬜ | `true` jika production key | Default sandbox |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ⬜ | Google Cloud Console | Kosong = login Google hilang |
-| `PILOT_ACCESS_CODE` | ⬜ | Kode rahasia | Kosong = signup terbuka |
 | `OPEN_DATA_API_KEY` | ⬜ | `openssl rand -hex 24` | Kosong = open data nonaktif (501) |
+| `API_INDONESIA_KEY` | ⬜ | dashboard.apiindonesia.id | Kosong = dropdown wilayah tetap jalan dari cache DB; bisa juga diisi di `/admin/pengaturan` |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` / `AWS_ENDPOINT_URL_S3` / `NEON_UPLOADS_BUCKET` | ⬜ | Kredensial S3-compatible (Neon Object Storage) | Kosong = unggah foto produk nonaktif |
+
+> **Perilaku cron sejak pembaruan:** bila `CRON_SHARED_SECRET` kosong di
+> produksi, `/api/orders/expire` dan `/api/pricing/recompute` **menolak semua
+> request (503)** — bukan lagi diizinkan dengan peringatan. Set secret-nya
+> sebelum menyalakan cron.
+>
+> **Pemeriksaan konfigurasi:** `GET /api/health` mengembalikan `config.missingRequired`
+> (daftar nama env wajib yang belum diisi) tanpa pernah menampilkan nilainya.
 
 4. Klik **Deploy** (± 2–3 menit).
 
@@ -73,11 +82,29 @@ npm run db:seed
 1. Salin URL final (mis. `https://panenkita-xxx.vercel.app` atau custom domain).
 2. Update env `BETTER_AUTH_URL` dan `NEXT_PUBLIC_APP_URL` dengan URL final →
    **Deployments → Redeploy** (env baru hanya berlaku di build/deploy baru).
-3. Uji cepat:
+3. **Buat superadmin pertama** (satu kali, dari mesin lokal yang punya akses DB):
+
+   ```bash
+   # daftar dulu lewat /signup di situs produksi, lalu:
+   npm run promote:superadmin -- admin@emailAnda.com
+   # batalkan bila salah orang:
+   npm run promote:superadmin -- admin@emailAnda.com --revoke
+   ```
+
+   Login berikutnya langsung diarahkan ke `/admin` — pantau GMV & fee, setujui
+   KWT baru, kelola pengguna, dan atur token WA/API wilayah.
+
+4. Catatan moderasi KWT: kelompok yang mendaftar berstatus **menunggu** dan
+   belum tampil di `/katalog` sampai disetujui di `/admin/kwt` (pembuatnya
+   otomatis dikabari lewat WhatsApp bila nomornya terdaftar).
+
+5. Uji cepat:
    - `/` landing + `/katalog` direktori tampil
-   - Signup + daftar KWT baru
+   - Signup + daftar KWT baru → muncul di `/admin/kwt` sebagai menunggu
+   - Setujui → katalog publik memuat kelompok tersebut
    - Login → dashboard → tambah produk → panen
    - Katalog publik → pesan → pesanan muncul di dashboard
+   - Lupa kata sandi → tautan reset terkirim via WhatsApp (butuh `FONTE_TOKEN`)
 
 ---
 
