@@ -169,7 +169,7 @@ function WaTokenSection({
           {status.configured ? "✅ Terpasang" : "⚠️ Belum dipasang"}
         </span>
         {status.configured && (
-          <span className="text-xs text-slate-">
+          <span className="text-xs text-slate-400">
             sumber: {status.source === "database" ? "disimpan di sini" : "env server"}
             {status.masked ? ` (${status.masked})` : ""}
           </span>
