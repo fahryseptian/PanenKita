@@ -1,6 +1,12 @@
 import { requireAdmin } from "@/lib/session";
 import { getKwtById } from "@/lib/queries";
-import { rotateInviteCode, updateKwtProfile } from "@/lib/actions/kwt";
+import { getWaTokenStatus } from "@/lib/app-settings";
+import {
+  clearWaToken,
+  rotateInviteCode,
+  saveWaToken,
+  updateKwtProfile,
+} from "@/lib/actions/kwt";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +32,17 @@ export default async function KwtSettingsPage({
         </p>
       </header>
 
-      {sp.sukses && (
+      {sp.sukses === "wa" && (
+        <p className="rounded-lg bg-brand-50 px-4 py-2 text-sm text-brand-700">
+          ✅ Token WA tersimpan — pesan uji dikirim ke nomor Anda (cek WhatsApp).
+        </p>
+      )}
+      {sp.sukses === "wa-clear" && (
+        <p className="rounded-lg bg-brand-50 px-4 py-2 text-sm text-brand-700">
+          Token WA dihapus dari database — kembali ke konfigurasi server (bila ada).
+        </p>
+      )}
+      {sp.sukses && sp.sukses !== "wa" && sp.sukses !== "wa-clear" && (
         <p className="rounded-lg bg-brand-50 px-4 py-2 text-sm text-brand-700">
           ✅ Profil kelompok diperbarui.
         </p>
@@ -102,6 +118,9 @@ export default async function KwtSettingsPage({
         </form>
       </section>
 
+      {/* Token WA — diatur admin tanpa akses Vercel */}
+      <WaTokenSection status={await getWaTokenStatus()} />
+
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
         <h2 className="font-semibold">Kode undangan</h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -123,5 +142,68 @@ export default async function KwtSettingsPage({
         </div>
       </section>
     </div>
+  );
+}
+
+function WaTokenSection({
+  status,
+}: {
+  status: Awaited<ReturnType<typeof getWaTokenStatus>>;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+      <h2 className="font-semibold">📲 Notifikasi WhatsApp (Fonnte)</h2>
+      <p className="mt-1 text-sm text-slate-500">
+        Notifikasi pesanan/panen dikirim via Fonnte. Tempel device token dari
+        dashboard fonnte.com di sini — tidak perlu akses server.
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-medium ${
+            status.configured
+              ? "bg-brand-50 text-brand-700"
+              : "bg-amber-50 text-amber-700"
+          }`}
+        >
+          {status.configured ? "✅ Terpasang" : "⚠️ Belum dipasang"}
+        </span>
+        {status.configured && (
+          <span className="text-xs text-slate-">
+            sumber: {status.source === "database" ? "disimpan di sini" : "env server"}
+            {status.masked ? ` (${status.masked})` : ""}
+          </span>
+        )}
+      </div>
+
+      <form action={saveWaToken} className="mt-3 space-y-2">
+        <input
+          type="password"
+          name="token"
+          required
+          minLength={6}
+          placeholder="Tempel token Fonnte baru di sini"
+          autoComplete="off"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="submit"
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+          >
+            Simpan & kirim pesan uji
+          </button>
+          {status.source === "database" && (
+            <button
+              type="submit"
+              formAction={clearWaToken}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-red-50 hover:text-red-600"
+            >
+              Hapus token tersimpan
+            </button>
+          )}
+        </div>
+      </form>
+    </section>
   );
 }

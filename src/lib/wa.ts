@@ -7,6 +7,7 @@
 import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { formatRupiah } from "./pricing";
+import { getWaToken } from "./app-settings";
 
 export type NotificationKind =
   | "harvest"
@@ -34,7 +35,8 @@ export async function sendWa(
   /** Override target di log notifikasi (mis. productId untuk dedupe stok). */
   logTargetOverride?: string,
 ): Promise<void> {
-  const token = process.env.FONTE_TOKEN;
+  // Token: disimpan admin via UI (app_settings) dulu, fallback env Vercel.
+  const token = await getWaToken();
   let sent = false;
   let error: string | null = null;
 

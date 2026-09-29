@@ -36,10 +36,10 @@ async function main() {
   const notifs = await sql`
     select count(*)::int as n from notifications
     where message like '%PK-20260929-%'`;
-  console.log("Sisa order uji:", leftOrders[0].n);
-  console.log("Sisa produk uji:", leftProduct[0].n);
+  console.log("Sisa order uji:", leftOrders[0]?.n ?? 0);
+  console.log("Sisa produk uji:", leftProduct[0]?.n ?? 0);
   console.log(
-    `Log notifikasi uji: ${notifs[0].n} entri (dibiarkan sebagai audit trail)`,
+    `Log notifikasi uji: ${notifs[0]?.n ?? 0} entri (dibiarkan sebagai audit trail)`,
   );
 }
 

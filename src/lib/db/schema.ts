@@ -442,6 +442,15 @@ export const pricingEvents = pgTable(
   (t) => [index("pricing_events_product_time_idx").on(t.productId, t.createdAt)],
 );
 
+/** Pengaturan aplikasi global (key-value) — mis. token WA yang diatur admin via UI. */
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const notifications = pgTable(
   "notifications",
   {

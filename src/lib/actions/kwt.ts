@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { kwtMembers, kwts, pricingRules, products } from "@/lib/db/schema";
+import { kwtMembers, kwts, pricingRules, products, user } from "@/lib/db/schema";
 import { ACTIVE_KWT_COOKIE, requireAdmin, requireSession } from "@/lib/session";
 import { kwtRegistrationSchema } from "@/lib/validation";
+import { WA_TOKEN_KEY, deleteSetting, getWaTokenStatus, setSetting } from "@/lib/app-settings";
+import { sendWa, testMessage } from "@/lib/wa";
 
 function slugify(text: string): string {
   return text
@@ -163,6 +165,43 @@ export async function updateKwtProfile(formData: FormData): Promise<void> {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/pengaturan");
   redirect("/dashboard/pengaturan?sukses=1");
+}
+
+/**
+ * Simpan token Fonnte (WA) di app_settings — admin KWT bisa mengaturnya sendiri
+ * tanpa akses dashboard Vercel. Nilai tidak pernah dikirim balik ke browser.
+ */
+export async function saveWaToken(formData: FormData): Promise<void> {
+  const ctx = await requireAdmin();
+  const token = String(formData.get("token") ?? "").trim();
+  if (!token) return;
+  await setSetting(WA_TOKEN_KEY, token);
+
+  // Verifikasi langsung: kirim pesan uji ke admin yang menyimpan (bila punya nomor).
+  const [me] = await db
+    .select({ phone: user.phone })
+    .from(user)
+    .where(eq(user.id, ctx.userId))
+    .limit(1);
+  if (me?.phone) {
+    await sendWa("test", ctx.kwtId, { phone: me.phone, name: ctx.userName }, testMessage(ctx.userName));
+  }
+  revalidatePath("/dashboard/pengaturan");
+  redirect("/dashboard/pengaturan?sukses=wa");
+}
+
+/** Hapus token WA dari DB (kembali ke env Vercel bila ada). */
+export async function clearWaToken(): Promise<void> {
+  const ctx = await requireAdmin();
+  await deleteSetting(WA_TOKEN_KEY);
+  revalidatePath("/dashboard/pengaturan");
+  redirect("/dashboard/pengaturan?sukses=wa-clear");
+}
+
+/** Status token untuk halaman pengaturan (masked). */
+export async function waTokenStatus() {
+  await requireAdmin();
+  return getWaTokenStatus();
 }
 
 /** Putar kode undangan KWT (admin) — kode lama tidak berlaku lagi. */
