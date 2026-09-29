@@ -1,9 +1,9 @@
 import { headers, cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { auth, type Session } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { kwtMembers, kwts } from "@/lib/db/schema";
+import { kwtMembers, kwts, user as userTable } from "@/lib/db/schema";
 
 export type MemberRole = "ketua" | "bendahara" | "anggota";
 
@@ -16,6 +16,8 @@ export interface KwtContext {
   userId: string;
   userName: string;
   isAdmin: boolean; // ketua atau bendahara
+  /** Status moderasi platform: pending | approved | rejected */
+  kwtStatus: "pending" | "approved" | "rejected";
 }
 
 export interface Membership {
@@ -75,6 +77,7 @@ export async function requireKwtContext(): Promise<KwtContext> {
       kwtSlug: kwts.slug,
       inviteCode: kwts.inviteCode,
       role: kwtMembers.role,
+      kwtStatus: kwts.status,
     })
     .from(kwtMembers)
     .innerJoin(kwts, eq(kwtMembers.kwtId, kwts.id))
@@ -113,6 +116,7 @@ export async function requireKwtContext(): Promise<KwtContext> {
     isAdmin: role === "ketua" || role === "bendahara",
     userId: session.user.id,
     userName: session.user.name,
+    kwtStatus: active.kwtStatus as "pending" | "approved" | "rejected",
   };
 }
 
@@ -123,6 +127,50 @@ export async function requireAdmin(): Promise<KwtContext> {
     throw new Error("Hanya ketua/bendahara yang dapat melakukan aksi ini");
   }
   return ctx;
+}
+
+// ---------------------------------------------------------------------------
+// Superadmin (role level platform, terpisah dari role keanggotaan KWT)
+// ---------------------------------------------------------------------------
+
+export type PlatformRole = "user" | "superadmin";
+
+/** Role platform seorang user ("user" jika baris/tabel belum berisi). */
+export async function getPlatformRole(userId: string): Promise<PlatformRole> {
+  const [row] = await db
+    .select({ role: userTable.role })
+    .from(userTable)
+    .where(eq(userTable.id, userId))
+    .limit(1);
+  return (row?.role as PlatformRole | undefined) ?? "user";
+}
+
+/** Cek ringan tanpa redirect — untuk menyembunyikan/menampilkan elemen UI. */
+export async function isSuperadmin(): Promise<boolean> {
+  const session = await getSession();
+  if (!session) return false;
+  return (await getPlatformRole(session.user.id)) === "superadmin";
+}
+
+/**
+ * Guard aksi superadmin (kelola seluruh platform via /admin).
+ * Melempar Error — dipakai di server actions & API.
+ */
+export async function requireSuperadmin(): Promise<Session> {
+  const session = await requireSession();
+  const role = await getPlatformRole(session.user.id);
+  if (role !== "superadmin") {
+    throw new Error("Hanya superadmin yang dapat melakukan aksi ini");
+  }
+  return session;
+}
+
+/** Guard halaman: redirect ke /dashboard bila bukan superadmin. */
+export async function requireSuperadminPage(): Promise<Session> {
+  const session = await requireSession();
+  const role = await getPlatformRole(session.user.id);
+  if (role !== "superadmin") redirect("/dashboard");
+  return session;
 }
 
 /** Pastikan userId adalah anggota KWT tertentu. Return perannya. */

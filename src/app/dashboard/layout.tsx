@@ -5,6 +5,7 @@ import { SignOutButton } from "./sign-out-button";
 import { KwtSwitcher } from "./kwt-switcher";
 import { NAV } from "./nav-items";
 import { MobileMenu } from "./mobile-menu";
+import { NotificationBell } from "./notification-bell";
 
 export default async function DashboardLayout({
   children,
@@ -41,9 +42,14 @@ export default async function DashboardLayout({
           ))}
         </nav>
         <div className="border-t border-slate-100 p-4">
-          <KwtSwitcher current={ctx.kwtId} memberships={membershipsLite} />
-          <p className="mt-3 truncate text-sm font-medium">{ctx.userName}</p>
-          <p className="text-xs capitalize text-brand-600">{ctx.role}</p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <KwtSwitcher current={ctx.kwtId} memberships={membershipsLite} />
+              <p className="mt-3 truncate text-sm font-medium">{ctx.userName}</p>
+              <p className="text-xs capitalize text-brand-600">{ctx.role}</p>
+            </div>
+            <NotificationBell />
+          </div>
           <SignOutButton />
         </div>
       </aside>
@@ -58,6 +64,7 @@ export default async function DashboardLayout({
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">
             {ctx.kwtName}
           </span>
+          <NotificationBell />
           <MobileMenu
             isAdmin={ctx.isAdmin}
             kwtId={ctx.kwtId}
