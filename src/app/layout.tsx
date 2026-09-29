@@ -1,10 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { ServiceWorkerRegistrar } from "./sw-register";
 import "./globals.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const productName = process.env.NEXT_PUBLIC_PRODUCT_NAME ?? "PanenKita";
+
+export const viewport: Viewport = {
+  themeColor: "#16a34a",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -32,6 +37,7 @@ export default function RootLayout({
     <html lang="id">
       <body className="min-h-screen bg-white text-slate-900">
         {children}
+        <ServiceWorkerRegistrar />
         <Analytics />
         <SpeedInsights />
       </body>

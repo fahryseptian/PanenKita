@@ -3,6 +3,7 @@
  * Jalankan: npm run db:seed (butuh "db:seed" di package.json scripts)
  *
  * Akun demo:
+ *   admin@panenkita.id      / panenkita123  (superadmin platform, /admin)
  *   ketua@panenkita.id      / panenkita123  (ketua)
  *   bendahara@panenkita.id  / panenkita123  (bendahara)
  *   anggota@panenkita.id    / panenkita123  (anggota)
@@ -73,6 +74,32 @@ async function upsertUser(opts: {
 async function main() {
   console.log("Seeding PanenKita...");
 
+  // 0. Akun superadmin platform (tanpa keanggotaan KWT — mengelola via /admin)
+  {
+    const email = "admin@panenkita.id";
+    const [existing] = await db.select().from(user).where(eq(user.email, email)).limit(1);
+    if (!existing) {
+      const adminId = crypto.randomUUID();
+      await db.insert(user).values({
+        id: adminId,
+        name: "Admin PanenKita",
+        email,
+        phone: "6281234567899",
+        waOptIn: false,
+        emailVerified: true,
+        role: "superadmin",
+      });
+      await db.insert(account).values({
+        id: crypto.randomUUID(),
+        userId: adminId,
+        accountId: adminId,
+        providerId: "credential",
+        password: await hashPassword(DEMO_PASSWORD),
+      });
+      console.log(`Superadmin: ${email} / ${DEMO_PASSWORD} → /admin`);
+    }
+  }
+
   // 1. Dua KWT (demo multi-kelompok untuk skala nasional)
   let [kwt] = await db.select().from(kwts).where(eq(kwts.slug, "mekar-sari")).limit(1);
   if (!kwt) {
@@ -89,6 +116,11 @@ async function main() {
       .returning();
   }
   if (!kwt) throw new Error("Gagal membuat KWT");
+  // Data demo selalu disetujui superadmin agar langsung tampil di katalog.
+  await db
+    .update(kwts)
+    .set({ status: "approved", approvedAt: kwt.approvedAt ?? new Date() })
+    .where(eq(kwts.id, kwt.id));
   console.log(`KWT 1: ${kwt.name} (${kwt.slug}) — kode: ${kwt.inviteCode}`);
 
   let [kwt2] = await db.select().from(kwts).where(eq(kwts.slug, "srikandi-makmur")).limit(1);
@@ -106,6 +138,10 @@ async function main() {
       .returning();
   }
   if (!kwt2) throw new Error("Gagal membuat KWT kedua");
+  await db
+    .update(kwts)
+    .set({ status: "approved", approvedAt: kwt2.approvedAt ?? new Date() })
+    .where(eq(kwts.id, kwt2.id));
   console.log(`KWT 2: ${kwt2.name} (${kwt2.slug}) — kode: ${kwt2.inviteCode}`);
 
   // 2. Pengguna
@@ -251,7 +287,7 @@ async function main() {
     console.log(`Panen KWT 2: ${rows2.length} catatan`);
   }
 
-  console.log("Selesai ✔  Login: ketua@panenkita.id / panenkita123 (KWT 1) atau ratna@panenkita.id / panenkita123 (KWT 2)");
+  console.log("Selesai ✔  Login: admin@panenkita.id (superadmin), ketua@panenkita.id / panenkita123 (KWT 1) atau ratna@panenkita.id / panenkita123 (KWT 2)");
   process.exit(0);
 }
 

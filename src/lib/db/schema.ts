@@ -22,6 +22,10 @@ export const memberRoleEnum = pgEnum("member_role", [
   "bendahara",
   "anggota",
 ]);
+/** Role level platform (terpisah dari role keanggotaan KWT). */
+export const userRoleEnum = pgEnum("user_role", ["user", "superadmin"]);
+/** Status moderasi KWT di level platform. */
+export const kwtStatusEnum = pgEnum("kwt_status", ["pending", "approved", "rejected"]);
 export const qualityGradeEnum = pgEnum("quality_grade", ["A", "B", "C"]);
 /** Tujuan bagian panen yang tidak terjual: donasi / kompos / hilang. */
 export const wasteDestinationEnum = pgEnum("waste_destination", [
@@ -83,6 +87,7 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "order_expired",
   "broadcast",
   "test",
+  "password_reset",
 ]);
 // ---------------------------------------------------------------------------
 // Better Auth tables (generated with the auth CLI, kept in our schema)
@@ -94,6 +99,8 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  /** Role level platform: user biasa atau superadmin (kelola seluruh platform). */
+  role: userRoleEnum("role").notNull().default("user"),
   /** Nomor WhatsApp, format internasional tanpa tanda +, mis. 6281234567890 */
   phone: text("phone"),
   /** Ikut menerima notifikasi perubahan harga via WhatsApp */
@@ -203,6 +210,13 @@ export const kwts = pgTable(
     regionCode: text("region_code"),
     /** Kode desa adm4 untuk cuaca BMKG — di-cache otomatis dari nama kab/kota */
     weatherAdm4: text("weather_adm4"),
+    /**
+     * Moderasi: KWT baru = "pending" (belum tampil di katalog publik).
+     * Superadmin menyetujui ("approved") atau menolak ("rejected") via /admin.
+     */
+    status: kwtStatusEnum("status").notNull().default("pending"),
+    /** Kapan KWT disetujui superadmin (null = belum). */
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
     inviteCode: text("invite_code"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -481,20 +495,26 @@ export const notifications = pgTable(
   "notifications",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    kwtId: uuid("kwt_id")
-      .notNull()
-      .references(() => kwts.id, { onDelete: "cascade" }),
+    /** null = notifikasi personal (bukan terikat kelompok), mis. reset password */
+    kwtId: uuid("kwt_id").references(() => kwts.id, { onDelete: "cascade" }),
+    /** Penerima personal (userId) untuk notifikasi yang tidak terikat KWT */
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
     kind: notificationKindEnum("kind").notNull(),
     target: text("target").notNull(),
     message: text("message").notNull(),
     /** true = terkirim ke Fonnte, false = gagal atau token tidak diset */
     sent: boolean("sent").notNull().default(false),
     error: text("error"),
+    /** Kapan notifikasi dibaca di lonceng in-app (null = belum/belum ada lonceng) */
+    readAt: timestamp("read_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("notifications_kwt_time_idx").on(t.kwtId, t.createdAt)],
+  (t) => [
+    index("notifications_kwt_time_idx").on(t.kwtId, t.createdAt),
+    index("notifications_user_time_idx").on(t.userId, t.createdAt),
+  ],
 );
 
 export const feedback = pgTable("feedback", {

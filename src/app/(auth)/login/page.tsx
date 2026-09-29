@@ -78,6 +78,12 @@ export default function LoginPage() {
           Daftar
         </Link>
       </p>
+
+      <p className="text-center text-sm">
+        <Link href="/lupa-password" className="text-slate-400 hover:text-brand-600 hover:underline">
+          Lupa kata sandi?
+        </Link>
+      </p>
     </form>
   );
 }

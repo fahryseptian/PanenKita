@@ -44,6 +44,8 @@ export async function getDirectory(
   }
   if (province) conds.push(eq(kwts.province, province));
   if (regency) conds.push(eq(kwts.regency, regency));
+  // Moderasi: hanya KWT yang sudah disetujui superadmin yang tampil publik.
+  conds.push(eq(kwts.status, "approved"));
   const where = conds.length > 0 ? and(...conds) : undefined;
 
   const [groups, productCatRows, memberCounts] = await Promise.all([
@@ -115,13 +117,19 @@ export async function getDirectoryFacets(): Promise<DirectoryFacets> {
     db
       .select({ province: kwts.province, n: count() })
       .from(kwts)
-      .where(isNotNull(kwts.province))
+      .where(and(isNotNull(kwts.province), eq(kwts.status, "approved")))
       .groupBy(kwts.province)
       .orderBy(kwts.province),
     db
       .select({ province: kwts.province, regency: kwts.regency, n: count() })
       .from(kwts)
-      .where(and(isNotNull(kwts.province), isNotNull(kwts.regency)))
+      .where(
+        and(
+          isNotNull(kwts.province),
+          isNotNull(kwts.regency),
+          eq(kwts.status, "approved"),
+        ),
+      )
       .groupBy(kwts.province, kwts.regency)
       .orderBy(kwts.province, kwts.regency),
   ]);
@@ -138,9 +146,12 @@ export async function getDirectoryFacets(): Promise<DirectoryFacets> {
   };
 }
 
-/** Statistik agregat platform (untuk hero direktori). */
+/** Statistik agregat platform (untuk hero direktori) — hanya KWT disetujui. */
 export async function getPlatformStats() {
-  const [kwtCount] = await db.select({ n: sql<number>`count(*)::int` }).from(kwts);
+  const [kwtCount] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(kwts)
+    .where(eq(kwts.status, "approved"));
   const [productCount] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(products)

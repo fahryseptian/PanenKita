@@ -61,8 +61,16 @@ export async function getCatalog(kwtId: string): Promise<CatalogItem[]> {
   }));
 }
 
+/**
+ * KWT untuk halaman publik — hanya yang sudah disetujui superadmin.
+ * (Profil internal dashboard memakai getKwtById tanpa gate moderasi.)
+ */
 export async function getKwtBySlug(slug: string) {
-  const [row] = await db.select().from(kwts).where(eq(kwts.slug, slug)).limit(1);
+  const [row] = await db
+    .select()
+    .from(kwts)
+    .where(and(eq(kwts.slug, slug), eq(kwts.status, "approved")))
+    .limit(1);
   return row ?? null;
 }
 
@@ -108,7 +116,7 @@ export async function getRecentProducts(limit = 8): Promise<RecentProduct[]> {
     })
     .from(products)
     .innerJoin(kwts, eq(products.kwtId, kwts.id))
-    .where(eq(products.isActive, true))
+    .where(and(eq(products.isActive, true), eq(kwts.status, "approved")))
     .orderBy(desc(products.createdAt))
     .limit(limit);
 

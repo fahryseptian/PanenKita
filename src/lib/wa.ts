@@ -18,7 +18,8 @@ export type NotificationKind =
   | "stock_out"
   | "order_expired"
   | "broadcast"
-  | "test";
+  | "test"
+  | "password_reset";
 
 export interface WaRecipient {
   /** Nomor internasional tanpa +, mis. 6281234567890 */
@@ -29,11 +30,13 @@ export interface WaRecipient {
 
 export async function sendWa(
   kind: NotificationKind,
-  kwtId: string,
+  kwtId: string | null,
   recipient: WaRecipient,
   message: string,
   /** Override target di log notifikasi (mis. productId untuk dedupe stok). */
   logTargetOverride?: string,
+  /** Penerima personal untuk notifikasi tanpa KWT (mis. reset password). */
+  userId?: string,
 ): Promise<void> {
   // Token: disimpan admin via UI (app_settings) dulu, fallback env Vercel.
   const token = await getWaToken();
@@ -73,6 +76,7 @@ export async function sendWa(
   try {
     await db.insert(notifications).values({
       kwtId,
+      userId: userId ?? null,
       kind,
       target: logTargetOverride ?? recipient.phone,
       message,
@@ -245,4 +249,18 @@ export function broadcastMessage(opts: {
 
 export function testMessage(name: string): string {
   return `👋 Halo ${name}! Ini pesan uji dari PanenKita. Jika Anda menerima ini, notifikasi WhatsApp berfungsi normal. 🌾`;
+}
+
+/** Tautan atur ulang kata sandi (token kedaluwarsa 1 jam). */
+export function passwordResetMessage(opts: { name: string; resetUrl: string }): string {
+  return [
+    `🔑 *Atur ulang kata sandi PanenKita*,`,
+    ``,
+    `Halo ${opts.name}, kami menerima permintaan atur ulang kata sandi untuk akun Anda.`,
+    ``,
+    `Ketuk tautan ini (berlaku 1 jam):`,
+    opts.resetUrl,
+    ``,
+    `Jika Anda tidak meminta ini, abaikan pesan ini — kata sandi Anda tidak berubah.`,
+  ].join("\n");
 }
