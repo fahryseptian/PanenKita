@@ -11,7 +11,9 @@ import {
   getDashboardOverview,
   getHarvests,
   getOrders,
+  getTopProducts,
 } from "@/lib/queries";
+import { TopProductsChart } from "./top-products";
 import { getHarvestForecast } from "@/lib/queries-forecast";
 import { formatRupiah, formatDateTime, formatQuantity, timeAgo } from "@/lib/format";
 import { after } from "next/server";
@@ -22,7 +24,11 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Ringkasan" };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ top?: string }>;
+}) {
   // Plan Hobby Vercel tak mendukung cron sub-harian: kedaluwarsa dijalankan lazy
   // setiap dashboard dibuka (non-blocking), cron harian tetap sebagai cadangan.
   after(async () => {
@@ -34,12 +40,15 @@ export default async function DashboardPage() {
     }
   });
 
+  const { top: topParam } = await searchParams;
+  const days = [7, 30, 90].includes(Number(topParam)) ? Number(topParam) : 30;
   const ctx = await requireKwtContext();
-  const [overview, recentHarvests, recentOrders, forecast] = await Promise.all([
+  const [overview, recentHarvests, recentOrders, forecast, topProducts] = await Promise.all([
     getDashboardOverview(ctx.kwtId),
     getHarvests(ctx.kwtId, { limit: 5 }),
     getOrders(ctx.kwtId, { limit: 5 }),
     getHarvestForecast(ctx.kwtId),
+    ctx.isAdmin ? getTopProducts(ctx.kwtId, days) : Promise.resolve([]),
   ]);
   const forecastVisible = ctx.isAdmin ? forecast : forecast.filter((f) => f.trend !== "belum-cukup-data");
 
@@ -142,6 +151,9 @@ export default async function DashboardPage() {
           </p>
         </section>
       )}
+
+      {/* Produk terlaris — hanya admin */}
+      {ctx.isAdmin && <TopProductsChart rows={topProducts} days={days} />}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-slate-200 bg-white">

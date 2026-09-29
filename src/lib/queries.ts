@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   feedback,
@@ -117,6 +117,48 @@ export async function getRecentProducts(limit = 8): Promise<RecentProduct[]> {
     ...r,
     available: Math.max(0, stock.get(r.id)?.available ?? 0),
   }));
+}
+
+export interface TopProductRow {
+  productId: string;
+  productName: string;
+  unit: string;
+  qtySold: number;
+  revenue: number;
+  orderCount: number;
+}
+
+/** Produk terlaris berdasarkan pendapatan pesanan terbayar dalam N hari terakhir. */
+export async function getTopProducts(
+  kwtId: string,
+  days: number,
+  limit = 5,
+): Promise<TopProductRow[]> {
+  const since = new Date(Date.now() - days * 24 * 3_600_000);
+  return db
+    .select({
+      productId: products.id,
+      productName: products.name,
+      unit: products.unit,
+      qtySold: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::float`,
+      revenue: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPrice}), 0)::float`,
+      orderCount: sql<number>`count(distinct ${orders.id})::int`,
+    })
+    .from(orderItems)
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .innerJoin(products, eq(orderItems.productId, products.id))
+    .where(
+      and(
+        eq(orders.kwtId, kwtId),
+        gte(orders.createdAt, since),
+        inArray(orders.status, ["paid", "processing", "completed"]),
+      ),
+    )
+    .groupBy(products.id, products.name, products.unit)
+    .orderBy(
+      desc(sql`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPrice}), 0)`),
+    )
+    .limit(limit);
 }
 
 export async function getDashboardOverview(kwtId: string): Promise<DashboardOverview> {
