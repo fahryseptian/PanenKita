@@ -4,6 +4,15 @@ import { appSettings } from "@/lib/db/schema";
 
 export const WA_TOKEN_KEY = "fonte_token";
 
+/**
+ * Kunci token WA milik satu KWT (`fonte_token:<kwtId>`).
+ * Ketua/bendahara menyimpan device Fonnte kelompoknya di sini, sehingga
+ * pengaturan satu kelompok tidak menimpa device kelompok lain.
+ */
+export function waTokenKey(kwtId: string): string {
+  return `${WA_TOKEN_KEY}:${kwtId}`;
+}
+
 /** Key app_settings untuk rekening platform (penerima pembayaran biaya layanan). */
 export const PLATFORM_BANK_KEY = "platform_bank";
 
@@ -30,39 +39,85 @@ export async function deleteSetting(key: string): Promise<void> {
   await db.delete(appSettings).where(eq(appSettings.key, key));
 }
 
-/** Token Fonnte: prioritas token yang disimpan admin via UI, fallback env Vercel. */
-export async function getWaToken(): Promise<string | null> {
-  try {
-    const fromDb = await getSetting(WA_TOKEN_KEY);
-    if (fromDb) return fromDb;
-  } catch (err) {
-    console.error("[app-settings] failed to read WA token from DB", err);
-  }
-  return process.env.FONTE_TOKEN || null;
+/**
+ * `kwt` = device milik kelompok, `database` = token global platform,
+ * `env` = FONTE_TOKEN dari server, `none` = tidak ada sama sekali.
+ */
+export type WaTokenSource = "kwt" | "database" | "env" | "none";
+
+export interface WaTokenCandidates {
+  /** Token device milik KWT pemilik notifikasi. */
+  kwt?: string | null;
+  /** Token global platform — cadangan bila KWT belum mengatur sendiri. */
+  platform?: string | null;
+  /** FONTE_TOKEN dari environment server — cadangan terakhir. */
+  env?: string | null;
+}
+
+/**
+ * Urutan prioritas token Fonnte: KWT → platform → env server.
+ *
+ * Sengaja dipisah sebagai fungsi murni agar urutannya bisa diuji tanpa
+ * database, dan supaya pengaturan satu kelompok tidak pernah menimpa
+ * kelompok lain (bug: keduanya dulu menulis kunci global yang sama).
+ */
+export function pickWaToken(c: WaTokenCandidates): {
+  token: string | null;
+  source: WaTokenSource;
+} {
+  if (c.kwt) return { token: c.kwt, source: "kwt" };
+  if (c.platform) return { token: c.platform, source: "database" };
+  if (c.env) return { token: c.env, source: "env" };
+  return { token: null, source: "none" };
+}
+
+/**
+ * Token Fonnte efektif untuk sebuah KWT.
+ * `kwtId` boleh null untuk notifikasi tingkat platform (mis. reset kata sandi)
+ * — saat itu token KWT dilewati dan langsung memakai token platform/env.
+ */
+export async function getWaToken(kwtId?: string | null): Promise<string | null> {
+  const kwtToken = kwtId ? await readSettingSafe(waTokenKey(kwtId)) : null;
+  const platformToken = await readSettingSafe(WA_TOKEN_KEY);
+  const { token } = pickWaToken({
+    kwt: kwtToken,
+    platform: platformToken,
+    env: process.env.FONTE_TOKEN,
+  });
+  return token;
 }
 
 export type WaTokenStatus = {
   configured: boolean;
-  source: "database" | "env" | "none";
+  source: WaTokenSource;
   masked: string | null;
 };
 
-/** Status untuk UI — tidak pernah mengembalikan nilai token penuh. */
-export async function getWaTokenStatus(): Promise<WaTokenStatus> {
-  let fromDb: string | null = null;
+async function readSettingSafe(key: string): Promise<string | null> {
   try {
-    fromDb = await getSetting(WA_TOKEN_KEY);
-  } catch {
-    fromDb = null;
+    return await getSetting(key);
+  } catch (err) {
+    console.error("[app-settings] failed to read setting", key, err);
+    return null;
   }
-  if (fromDb) {
-    return { configured: true, source: "database", masked: maskToken(fromDb) };
-  }
-  const envToken = process.env.FONTE_TOKEN || null;
-  if (envToken) {
-    return { configured: true, source: "env", masked: maskToken(envToken) };
-  }
-  return { configured: false, source: "none", masked: null };
+}
+
+/** Status untuk UI — tidak pernah mengembalikan nilai token penuh. */
+export async function getWaTokenStatus(
+  kwtId?: string | null,
+): Promise<WaTokenStatus> {
+  const kwtToken = kwtId ? await readSettingSafe(waTokenKey(kwtId)) : null;
+  const platformToken = await readSettingSafe(WA_TOKEN_KEY);
+  const { token, source } = pickWaToken({
+    kwt: kwtToken,
+    platform: platformToken,
+    env: process.env.FONTE_TOKEN,
+  });
+  return {
+    configured: Boolean(token),
+    source,
+    masked: token ? maskToken(token) : null,
+  };
 }
 
 /** Sembunyikan nilai: cukup 4 karakter terakhir agar bisa dikenali pemiliknya. */

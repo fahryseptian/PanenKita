@@ -165,8 +165,8 @@ export default async function KwtSettingsPage({
         />
       </section>
 
-      {/* Token WA — diatur admin tanpa akses Vercel */}
-      <WaTokenSection status={await getWaTokenStatus()} />
+      {/* Token WA — device milik kelompok, diatur tanpa akses Vercel */}
+      <WaTokenSection status={await getWaTokenStatus(ctx.kwtId)} />
 
       {/* Data publik Indonesia (apiindonesia.id): API key + sinkron wilayah */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -237,6 +237,17 @@ export default async function KwtSettingsPage({
   );
 }
 
+/** Label sumber token agar pengurus tahu apakah ini device mereka atau cadangan. */
+const WA_SOURCE_LABEL: Record<
+  Awaited<ReturnType<typeof getWaTokenStatus>>["source"],
+  string
+> = {
+  kwt: "device kelompok ini",
+  database: "token global platform (cadangan)",
+  env: "env server (cadangan)",
+  none: "belum ada",
+};
+
 function WaTokenSection({
   status,
 }: {
@@ -247,7 +258,8 @@ function WaTokenSection({
       <h2 className="font-semibold">📲 Notifikasi WhatsApp (Fonnte)</h2>
       <p className="mt-1 text-sm text-slate-500">
         Notifikasi pesanan/panen dikirim via Fonnte. Tempel device token dari
-        dashboard fonnte.com di sini — tidak perlu akses server.
+        dashboard fonnte.com di sini — tidak perlu akses server. Token ini milik
+        kelompok Anda dan tidak mengubah pengaturan kelompok lain.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -262,7 +274,7 @@ function WaTokenSection({
         </span>
         {status.configured && (
           <span className="text-xs text-slate-400">
-            sumber: {status.source === "database" ? "disimpan di sini" : "env server"}
+            sumber: {WA_SOURCE_LABEL[status.source]}
             {status.masked ? ` (${status.masked})` : ""}
           </span>
         )}
@@ -285,13 +297,13 @@ function WaTokenSection({
           >
             Simpan & kirim pesan uji
           </button>
-          {status.source === "database" && (
+          {status.source === "kwt" && (
             <button
               type="submit"
               formAction={clearWaToken}
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-red-50 hover:text-red-600"
             >
-              Hapus token tersimpan
+              Hapus token kelompok ini
             </button>
           )}
         </div>

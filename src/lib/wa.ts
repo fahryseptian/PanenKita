@@ -39,8 +39,8 @@ export async function sendWa(
   /** Penerima personal untuk notifikasi tanpa KWT (mis. reset password). */
   userId?: string,
 ): Promise<void> {
-  // Token: disimpan admin via UI (app_settings) dulu, fallback env Vercel.
-  const token = await getWaToken();
+  // Token: device milik KWT dulu, lalu token global platform, lalu env Vercel.
+  const token = await getWaToken(kwtId);
   let sent = false;
   let error: string | null = null;
 

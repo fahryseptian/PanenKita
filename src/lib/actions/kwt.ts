@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { kwtMembers, kwts, pricingRules, products, user } from "@/lib/db/schema";
 import { ACTIVE_KWT_COOKIE, requireAdmin, requireSession } from "@/lib/session";
 import { kwtRegistrationSchema } from "@/lib/validation";
-import { WA_TOKEN_KEY, deleteSetting, getWaTokenStatus, setSetting } from "@/lib/app-settings";
+import { deleteSetting, getWaTokenStatus, setSetting, waTokenKey } from "@/lib/app-settings";
 import { API_INDONESIA_KEY_SETTING } from "@/lib/api-indonesia";
 import { syncRegions } from "@/lib/regions-db";
 import { sendWa, testMessage } from "@/lib/wa";
@@ -266,14 +266,15 @@ export async function saveKwtPaymentInfo(formData: FormData): Promise<void> {
 }
 
 /**
- * Simpan token Fonnte (WA) di app_settings — admin KWT bisa mengaturnya sendiri
- * tanpa akses dashboard Vercel. Nilai tidak pernah dikirim balik ke browser.
+ * Simpan token Fonnte (WA) milik kelompok ini di app_settings — ketua/bendahara
+ * bisa mengaturnya sendiri tanpa akses dashboard Vercel dan tanpa menyentuh
+ * device kelompok lain. Nilai tidak pernah dikirim balik ke browser.
  */
 export async function saveWaToken(formData: FormData): Promise<void> {
   const ctx = await requireAdmin();
   const token = String(formData.get("token") ?? "").trim();
   if (!token) return;
-  await setSetting(WA_TOKEN_KEY, token);
+  await setSetting(waTokenKey(ctx.kwtId), token);
 
   // Verifikasi langsung: kirim pesan uji ke admin yang menyimpan (bila punya nomor).
   const [me] = await db
@@ -288,18 +289,18 @@ export async function saveWaToken(formData: FormData): Promise<void> {
   redirect("/dashboard/pengaturan?sukses=wa");
 }
 
-/** Hapus token WA dari DB (kembali ke env Vercel bila ada). */
+/** Hapus token WA kelompok ini (kembali ke token platform / env bila ada). */
 export async function clearWaToken(): Promise<void> {
   const ctx = await requireAdmin();
-  await deleteSetting(WA_TOKEN_KEY);
+  await deleteSetting(waTokenKey(ctx.kwtId));
   revalidatePath("/dashboard/pengaturan");
   redirect("/dashboard/pengaturan?sukses=wa-clear");
 }
 
-/** Status token untuk halaman pengaturan (masked). */
+/** Status token untuk halaman pengaturan (masked, sudah memperhitungkan cadangan). */
 export async function waTokenStatus() {
-  await requireAdmin();
-  return getWaTokenStatus();
+  const ctx = await requireAdmin();
+  return getWaTokenStatus(ctx.kwtId);
 }
 
 /** Simpan API key apiindonesia.id di app_settings. */
