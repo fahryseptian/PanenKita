@@ -14,18 +14,52 @@ Panduan deploy produksi lengkap. Perkiraan waktu: 15 menit, tanpa kartu kredit.
    ```
    > Selalu pakai connection string **pooled** untuk Vercel serverless.
 
-### Push schema
+### Migrasi schema
 
-Dari folder `kwt/` (DATABASE_URL sementara di `kwt/.env`):
+Schema dikelola dengan **migrasi berversi**: SQL-nya tersimpan di `drizzle/`,
+ikut ter-commit, dan bisa di-review sebelum menyentuh produksi.
+
+**Database baru (kosong):**
 
 ```bash
-npm run db:push
+npm run db:migrate
 ```
 
-> ℹ️ Fase 4 menambah kolom `orders.expires_at`, enum status `expired`, dan enum
-> notifikasi baru (`order_created`, `stock_out`, `order_expired`). Jalankan
-> `db:push` sekali lagi setelah update ini; pesanan lama yang masih pending tanpa
-> `expires_at` tidak akan pernah kedaluwarsa (aman).
+**Database yang sudah berisi data** (termasuk produksi saat ini) — jalankan **sekali**:
+
+```bash
+npm run db:baseline              # catat migrasi yang sudah ada TANPA menjalankannya
+npm run db:baseline -- --dry-run # opsional: lihat rencananya dulu
+npm run db:migrate               # verifikasi: tidak ada migrasi tertunda
+```
+
+`db:baseline` hanya menulis tabel pembukuan `drizzle.__drizzle_migrations` (schema
+baru) dan tidak menyentuh data aplikasi. Ia menolak berjalan bila tabel inti belum
+ada, supaya database kosong tidak "dianggap" sudah termigrasi. Hash-nya diambil
+dari `readMigrationFiles` — fungsi yang sama yang dipakai drizzle saat `migrate`.
+
+> ⚠️ **Jangan pakai `drizzle-kit push` pada database berisi data.** Push mencocokkan
+> seluruh schema dan akan menghapus tabel/kolom yang tidak dikenal schema lokal.
+> Karena itu `npm run db:push` sudah **dihapus** dari `package.json`.
+
+**Menambah perubahan schema selanjutnya:**
+
+```bash
+# 1. ubah src/lib/db/schema.ts
+npm run db:generate   # hasilkan drizzle/0001_*.sql (commit file ini)
+# 2. review SQL-nya — perhatikan setiap DROP/ALTER
+npm run db:migrate    # terapkan
+```
+
+Catatan koneksi: `drizzle.config.ts` memakai `DATABASE_URL_UNPOOLED` /
+`NEON_DATABASE_URL_UNPOOLED` bila tersedia (DDL lewat koneksi langsung lebih andal
+daripada PgBouncer). Runtime aplikasi tetap memakai `DATABASE_URL` pooled.
+
+### Riwayat migrasi
+
+| Migrasi | Isi |
+|---|---|
+| `0000_known_ben_grimm` | Baseline awal: 8 enum + 20 tabel (skema produksi saat ini) |
 
 ### Seed (opsional, untuk demo/pilot)
 

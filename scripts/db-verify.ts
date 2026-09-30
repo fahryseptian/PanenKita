@@ -14,11 +14,13 @@ if (!url) {
 
 const sql = neon(url);
 
+/** Daftar lengkap tabel yang harus ada — 20 tabel, sama dengan folder drizzle/. */
 const EXPECTED_TABLES = [
   "user", "session", "account", "verification",
-  "kwts", "kwt_members", "products", "harvests",
+  "kwts", "kwt_members", "products", "harvests", "harvest_schedules",
   "orders", "order_items", "pricing_rules", "pricing_events",
-  "notifications", "feedback",
+  "notifications", "feedback", "regions", "app_settings",
+  "kwt_commission_settings", "platform_fees", "kwt_settlements",
 ];
 
 const EXPECTED_COLUMNS: Array<[string, string]> = [

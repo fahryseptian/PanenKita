@@ -28,7 +28,8 @@ npm install
 
 # 1. Database (Neon free tier)
 cp .env.example .env   # isi DATABASE_URL
-npm run db:push
+npm run db:migrate     # jalankan migrasi berversi dari folder drizzle/
+# database yang sudah berisi data: `npm run db:baseline` sekali, lihat DEPLOY.md
 
 # 2. Data contoh (1 KWT + produk + panen + admin)
 npm run db:seed        # lihat src/db/seed.ts untuk kredensial demo
@@ -69,4 +70,17 @@ Buat Vercel Cron yang memanggil `GET /api/pricing/recompute` setiap 15 menit den
 npm run test         # unit test
 npm run typecheck    # tsc --noEmit
 npm run build        # production build
+
+npm run db:generate  # buat migrasi baru dari perubahan schema.ts
+npm run db:migrate   # terapkan migrasi yang tertunda
+npm run db:studio    # jelajahi data (Drizzle Studio)
 ```
+
+### Mengubah schema
+
+Schema memakai **migrasi berversi** — SQL hasil generate di folder `drizzle/` ikut
+ter-commit agar bisa di-review. Alurnya: ubah `src/lib/db/schema.ts` →
+`npm run db:generate` → periksa SQL-nya → `npm run db:migrate`.
+
+Jangan memakai `drizzle-kit push` pada database yang sudah berisi data: push
+mencocokkan seluruh schema dan dapat menghapus tabel/kolom yang tidak dikenalnya.
