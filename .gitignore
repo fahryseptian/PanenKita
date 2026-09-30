@@ -16,3 +16,6 @@ drizzle/meta/_journal.json.bak
 .vercel/
 .env.local
 .env.vercel-check
+
+# Local agent scratch (Codebuff/Freebuff)
+.freebuff/
