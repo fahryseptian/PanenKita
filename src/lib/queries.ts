@@ -79,6 +79,35 @@ export async function getKwtById(id: string) {
   return row ?? null;
 }
 
+/**
+ * Kontak pengurus KWT untuk pembeli (ketua, fallback bendahara).
+ * Dipakai halaman pesanan: pembeli mengirim bukti bayar via WhatsApp.
+ */
+export async function getKwtContact(
+  kwtId: string,
+): Promise<{ name: string; role: string; phone: string } | null> {
+  const rows = await db
+    .select({
+      name: user.name,
+      role: kwtMembers.role,
+      phone: user.phone,
+    })
+    .from(kwtMembers)
+    .innerJoin(user, eq(kwtMembers.userId, user.id))
+    .where(
+      and(
+        eq(kwtMembers.kwtId, kwtId),
+        inArray(kwtMembers.role, ["ketua", "bendahara"]),
+      ),
+    )
+    .orderBy(sql`case when ${kwtMembers.role} = 'ketua' then 0 else 1 end`);
+
+  const withPhone = rows.find((r) => r.phone);
+  return withPhone?.phone
+    ? { name: withPhone.name, role: withPhone.role, phone: withPhone.phone }
+    : null;
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard overview
 // ---------------------------------------------------------------------------
@@ -328,7 +357,6 @@ export interface OrderRow {
   note: string | null;
   status: string;
   total: number;
-  midtransOrderId: string | null;
   createdAt: Date;
   expiresAt: Date | null;
   items: OrderItemRow[];
@@ -364,11 +392,11 @@ export async function getOrders(
     orderNumber: o.orderNumber,
     buyerName: o.buyerName,
     buyerPhone: o.buyerPhone,
-    note: o.note,      status: o.status,
-      total: o.total,
-      midtransOrderId: o.midtransOrderId,
-      createdAt: o.createdAt,
-      expiresAt: o.expiresAt,
+    note: o.note,
+    status: o.status,
+    total: o.total,
+    createdAt: o.createdAt,
+    expiresAt: o.expiresAt,
     items: itemRows
       .filter((i) => i.orderId === o.id)
       .map((i) => ({

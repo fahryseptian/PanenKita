@@ -81,6 +81,7 @@ export async function GET(req: Request) {
   }
 
   if (type === "settlements") {
+    // Tagihan biaya layanan platform ke KWT (arah dana: KWT → platform).
     const rows = await db
       .select({
         kwtName: kwts.name,
@@ -90,6 +91,7 @@ export async function GET(req: Request) {
         reference: kwtSettlements.reference,
         note: kwtSettlements.note,
         settledThrough: kwtSettlements.settledThrough,
+        paidAt: kwtSettlements.paidAt,
         createdAt: kwtSettlements.createdAt,
       })
       .from(kwtSettlements)
@@ -100,26 +102,30 @@ export async function GET(req: Request) {
     const csv = toCsv(
       [
         "KWT",
-        "Jumlah Cair",
+        "Jumlah Tagihan",
         "Jumlah Fee",
-        "Cara",
+        "Status",
+        "Cara Bayar",
         "Referensi",
         "Catatan",
         "Fee s/d",
-        "Dicatat",
+        "Dibuat",
+        "Dibayar",
       ],
       rows.map((r) => [
         r.kwtName,
         r.amount,
         r.feeCount,
-        settlementMethodLabel(r.method),
+        r.paidAt ? "Lunas" : "Belum dibayar",
+        r.paidAt ? settlementMethodLabel(r.method) : "",
         r.reference ?? "",
         r.note ?? "",
         r.settledThrough.toISOString(),
         r.createdAt.toISOString(),
+        r.paidAt ? r.paidAt.toISOString() : "",
       ]),
     );
-    return csvResponse(csv, csvFilename(["pencairan-fee", today]));
+    return csvResponse(csv, csvFilename(["tagihan-fee", today]));
   }
 
   // default: orders

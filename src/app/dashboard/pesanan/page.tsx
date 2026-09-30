@@ -46,7 +46,8 @@ export default async function OrdersPage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Pesanan</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Pesanan masuk dari katalog publik. Pembayaran online dikonfirmasi otomatis.
+          Pesanan masuk dari katalog publik. Pembeli membayar langsung ke KWT
+          (tunai/transfer/QRIS) — konfirmasi setelah uang diterima.
         </p>
       </header>
 
@@ -99,7 +100,6 @@ export default async function OrdersPage() {
               {o.note && <p className="mt-2 text-sm text-slate-400">📝 {o.note}</p>}
               <p className="mt-2 text-xs text-slate-400">
                 {formatDateTime(o.createdAt)}
-                {o.midtransOrderId ? " · Midtrans" : ""}
               </p>
 
               {NEXT_STATUS[o.status] && NEXT_STATUS[o.status]!.length > 0 && (

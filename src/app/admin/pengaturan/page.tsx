@@ -1,11 +1,14 @@
-import { KeyRound, MapPin, RefreshCw, Trash2 } from "lucide-react";
+import { KeyRound, Landmark, MapPin, RefreshCw, Trash2 } from "lucide-react";
 import {
   adminApiIndonesiaStatus,
   adminWaTokenStatus,
   clearGlobalWaToken,
+  clearPlatformBankAccount,
+  platformBankStatus,
   saveAdminApiIndonesiaKey,
   adminSyncRegions,
   saveGlobalWaToken,
+  savePlatformBankAccount,
 } from "@/lib/actions/superadmin";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +19,10 @@ export default async function AdminSettingsPage({
   searchParams: Promise<{ sukses?: string; error?: string }>;
 }) {
   const { sukses, error } = await searchParams;
-  const [waStatus, apiStatus] = await Promise.all([
+  const [waStatus, apiStatus, platformBank] = await Promise.all([
     adminWaTokenStatus(),
     adminApiIndonesiaStatus(),
+    platformBankStatus(),
   ]);
 
   return (
@@ -47,6 +51,13 @@ export default async function AdminSettingsPage({
       {sukses === "sync" && (
         <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           ✅ Cache wilayah berhasil disinkronkan dari apiindonesia.id.
+        </p>
+      )}
+      {(sukses === "rekening-platform" || sukses === "rekening-platform-clear") && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          {sukses === "rekening-platform"
+            ? "✅ Rekening platform tersimpan — tampil di halaman Tagihan Fee."
+            : "Rekening platform dihapus."}
         </p>
       )}
       {error && (
@@ -128,6 +139,75 @@ export default async function AdminSettingsPage({
             </button>
           </form>
         </div>
+      </section>
+
+      {/* Rekening platform: tujuan pembayaran biaya layanan oleh KWT */}
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <h2 className="flex items-center gap-2 font-semibold">
+          <Landmark className="h-4 w-4 text-brand-600" />
+          Rekening platform
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          PanenKita tidak memegang uang pembeli: pembeli membayar langsung ke KWT,
+          lalu KWT melunasi biaya layanan platform ke rekening ini. Rekening ini
+          tampil di halaman <span className="font-medium">Tagihan Fee</span> supaya
+          pengurus KWT tahu ke mana harus transfer.
+        </p>
+
+        <p className="mt-3 text-sm">
+          Status:{" "}
+          {platformBank ? (
+            <span className="font-medium tabular-nums text-emerald-700">
+              {platformBank.bankName} · {platformBank.bankAccountNumber}
+              {platformBank.bankAccountHolder
+                ? ` a/n ${platformBank.bankAccountHolder}`
+                : ""}
+            </span>
+          ) : (
+            <span className="font-medium text-amber-700">belum diatur</span>
+          )}
+        </p>
+
+        <form action={savePlatformBankAccount} className="mt-4 flex flex-wrap items-end gap-2">
+          {(
+            [
+              { name: "bankName", label: "Bank", value: platformBank?.bankName ?? "", placeholder: "Mis. BRI" },
+              { name: "bankAccountNumber", label: "Nomor rekening", value: platformBank?.bankAccountNumber ?? "", placeholder: "012345678901" },
+              { name: "bankAccountHolder", label: "Nama pemilik", value: platformBank?.bankAccountHolder ?? "", placeholder: "Mis. PanenKita" },
+            ] as const
+          ).map((f) => (
+            <div key={f.name} className="min-w-40 flex-1">
+              <label htmlFor={f.name} className="mb-1 block text-xs font-medium text-slate-500">
+                {f.label}
+              </label>
+              <input
+                id={f.name}
+                name={f.name}
+                defaultValue={f.value}
+                placeholder={f.placeholder}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              />
+            </div>
+          ))}
+          <button
+            type="submit"
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+          >
+            Simpan
+          </button>
+        </form>
+
+        {platformBank && (
+          <form action={clearPlatformBankAccount} className="mt-2">
+            <button
+              type="submit"
+              className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-red-600 ring-1 ring-red-100 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              Hapus rekening
+            </button>
+          </form>
+        )}
       </section>
 
       {/* Token WA global */}

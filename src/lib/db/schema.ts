@@ -217,10 +217,17 @@ export const kwts = pgTable(
     regionCode: text("region_code"),
     /** Kode desa adm4 untuk cuaca BMKG — di-cache otomatis dari nama kab/kota */
     weatherAdm4: text("weather_adm4"),
-    /** Rekening pencairan fee (diisi superadmin; dipakai disbursement otomatis) */
+    /**
+     * Rekening KWT untuk menerima pembayaran pembeli. PanenKita tidak memegang
+     * uang: pembeli membayar langsung ke rekening ini (tunai/transfer/QRIS).
+     */
     bankName: text("bank_name"),
     bankAccountNumber: text("bank_account_number"),
     bankAccountHolder: text("bank_account_holder"),
+    /** Gambar QRIS KWT: key bucket "qris/<kwtId>.<ext>" atau URL http(s). */
+    qrisImageUrl: text("qris_image_url"),
+    /** Petunjuk tambahan untuk pembeli (mis. jam pengambilan, kontak bendahara). */
+    paymentNote: text("payment_note"),
     /**
      * Moderasi: KWT baru = "pending" (belum tampil di katalog publik).
      * Superadmin menyetujui ("approved") atau menolak ("rejected") via /admin.
@@ -338,7 +345,10 @@ export const orders = pgTable(
     note: text("note"),
     status: orderStatusEnum("status").notNull().default("pending"),
     total: integer("total").notNull().default(0),
-    /** Nomor pesanan Midtrans (snap token reference) */
+    /**
+     * Warisan kanal pembayaran online level platform (Midtrans). Sudah tidak
+     * dipakai: pembeli membayar langsung ke KWT. Dibiarkan agar data lama utuh.
+     */
     midtransOrderId: text("midtrans_order_id"),
     paymentSettledAt: timestamp("payment_settled_at", { withTimezone: true }),
     /**
@@ -503,8 +513,11 @@ export const pricingEvents = pgTable(
 );
 
 /**
- * Catatan pencairan fee platform per KWT (settlement).
- * Fee yang belum dicairkan = platform_fees setelah settled_through terakhir.
+ * Tagihan biaya layanan platform ke KWT (arah uang: KWT → platform).
+ *
+ * PanenKita TIDAK memegang uang pembeli: pembeli membayar langsung ke KWT,
+ * sehingga fee platform pada platform_fees menjadi kewajiban KWT ke platform.
+ * Fee yang belum ditagih = platform_fees setelah settled_through terakhir.
  */
 export const kwtSettlements = pgTable(
   "kwt_settlements",
@@ -513,17 +526,19 @@ export const kwtSettlements = pgTable(
     kwtId: uuid("kwt_id")
       .notNull()
       .references(() => kwts.id, { onDelete: "cascade" }),
-    /** Total fee yang dicairkan pada periode ini (rupiah) */
+    /** Total biaya layanan yang ditagihkan pada periode ini (rupiah) */
     amount: integer("amount").notNull(),
-    /** Batas waktu fee yang termasuk (semua fee <= settledThrough) */
+    /** Batas waktu fee yang termasuk tagihan ini (semua fee <= settledThrough) */
     settledThrough: timestamp("settled_through", { withTimezone: true }).notNull(),
-    /** Jumlah pesanan yang fee-nya termasuk dalam pencairan ini */
+    /** Jumlah pesanan yang fee-nya termasuk dalam tagihan ini */
     feeCount: integer("fee_count").notNull().default(0),
-    /** transfer | tunai | otomatis (disbursement API) */
+    /** transfer | tunai | otomatis (bank transfer dari KWT) */
     method: text("method").notNull().default("transfer"),
-    /** Nomor referensi transfer / payout id dari penyedia disbursement */
+    /** Nomor referensi pembayaran dari KWT */
     reference: text("reference"),
     note: text("note"),
+    /** Kapan KWT melunasi tagihan ini (null = belum dibayar). */
+    paidAt: timestamp("paid_at", { withTimezone: true }),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

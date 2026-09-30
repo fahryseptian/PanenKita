@@ -23,9 +23,15 @@ const EXPECTED_TABLES = [
 
 const EXPECTED_COLUMNS: Array<[string, string]> = [
   ["kwts", "regency"], ["kwts", "province"], ["kwts", "invite_code"],
+  // Kanal bayar KWT tempat pembeli membayar langsung.
+  ["kwts", "bank_name"], ["kwts", "bank_account_number"],
+  ["kwts", "qris_image_url"], ["kwts", "payment_note"],
   ["products", "current_price"], ["products", "category"],
   ["harvests", "waste_qty"], ["harvests", "quality"],
-  ["orders", "midtrans_order_id"], ["orders", "payment_settled_at"],
+  ["orders", "payment_settled_at"],
+  // Tagihan biaya layanan platform ke KWT.
+  ["kwt_settlements", "amount"], ["kwt_settlements", "paid_at"],
+  ["platform_fees", "total_fee"], ["platform_fees", "reversed_at"],
   ["pricing_rules", "surge_percent"], ["user", "wa_opt_in"],
 ];
 

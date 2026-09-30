@@ -204,37 +204,43 @@ export async function listRecentOrders(limit = 10): Promise<AdminOrderRow[]> {
   return rows.map((r) => ({ ...r, status: r.status as string }));
 }
 
-export interface SettlementRow {
+export interface KwtBillingRow {
   kwtId: string;
   kwtName: string;
-  /** Rekening tujuan pencairan (diisi superadmin; bisa kosong). */
-  bankName: string | null;
-  bankAccountNumber: string | null;
-  bankAccountHolder: string | null;
-  /** Fee belum tercairkan (setelah settlement terakhir). */
-  unsettledAmount: number;
-  unsettledCount: number;
-  /** Total fee aktif sepanjang waktu (informasi). */
+  /** KWT sudah punya kanal bayar untuk pembeli (rekening/QRIS)? */
+  hasPaymentChannel: boolean;
+  /** Biaya layanan aktif yang belum ditagih (setelah tagihan terakhir). */
+  unbilledAmount: number;
+  unbilledCount: number;
+  /** Tagihan yang sudah terbit tapi belum dilunasi KWT. */
+  outstandingAmount: number;
+  outstandingCount: number;
+  /** Total biaya layanan aktif sepanjang waktu (informasi). */
   totalAmount: number;
-  settledThrough: Date | null;
+  lastBilledAt: Date | null;
 }
 
-/** Rekap fee per KWT: berapa yang sudah dicairkan dan berapa yang belum. */
-export async function listSettlements(): Promise<SettlementRow[]> {
-  // Subquery korelatif: fee aktif setelah settlement terakhir dianggap belum tercairkan.
+/**
+ * Rekap tagihan biaya layanan per KWT (arah uang: KWT → platform).
+ * PanenKita tidak memegang uang pembeli, jadi biaya layanan ditagihkan ke KWT
+ * dan dilunasi lewat transfer/tunai ke rekening platform.
+ */
+export async function listFeeBilling(): Promise<KwtBillingRow[]> {
+  // Subquery korelatif: fee aktif setelah tagihan terakhir = belum ditagih.
   // Baris fee yang dibalik (reversed_at not null) tidak pernah ikut dihitung.
   const rows = await db
     .select({
       kwtId: kwts.id,
       kwtName: kwts.name,
-      bankName: kwts.bankName,
-      bankAccountNumber: kwts.bankAccountNumber,
-      bankAccountHolder: kwts.bankAccountHolder,
+      hasPaymentChannel: sql<boolean>`(
+        (${kwts.bankName} is not null and ${kwts.bankAccountNumber} is not null)
+        or ${kwts.qrisImageUrl} is not null
+      )`,
       totalAmount: sql<number>`coalesce((
         select sum(pf.total_fee) from platform_fees pf
         where pf.kwt_id = ${kwts.id} and pf.reversed_at is null
       ), 0)::int`,
-      unsettledAmount: sql<number>`coalesce((
+      unbilledAmount: sql<number>`coalesce((
         select sum(pf.total_fee) from platform_fees pf
         where pf.kwt_id = ${kwts.id}
           and pf.reversed_at is null
@@ -242,7 +248,7 @@ export async function listSettlements(): Promise<SettlementRow[]> {
             select max(s.settled_through) from kwt_settlements s where s.kwt_id = ${kwts.id}
           ), to_timestamp(0))
       ), 0)::int`,
-      unsettledCount: sql<number>`coalesce((
+      unbilledCount: sql<number>`coalesce((
         select count(*) from platform_fees pf
         where pf.kwt_id = ${kwts.id}
           and pf.reversed_at is null
@@ -250,28 +256,45 @@ export async function listSettlements(): Promise<SettlementRow[]> {
             select max(s.settled_through) from kwt_settlements s where s.kwt_id = ${kwts.id}
           ), to_timestamp(0))
       ), 0)::int`,
-      settledThrough: sql<Date | null>`(
+      lastBilledAt: sql<Date | null>`(
         select max(s.settled_through) from kwt_settlements s where s.kwt_id = ${kwts.id}
       )`,
     })
     .from(kwts)
     .orderBy(kwts.name);
 
-  return rows.map((r) => ({
-    kwtId: r.kwtId,
-    kwtName: r.kwtName,
-    bankName: r.bankName,
-    bankAccountNumber: r.bankAccountNumber,
-    bankAccountHolder: r.bankAccountHolder,
-    unsettledAmount: Number(r.unsettledAmount),
-    unsettledCount: Number(r.unsettledCount),
-    totalAmount: Number(r.totalAmount),
-    settledThrough: r.settledThrough ? new Date(r.settledThrough) : null,
-  }));
+  // Tagihan terbit yang belum dibayar — diagregasi terpisah lalu digabung.
+  const outstanding = await db
+    .select({
+      kwtId: kwtSettlements.kwtId,
+      amount: sql<number>`coalesce(sum(${kwtSettlements.amount}), 0)::int`,
+      n: count(),
+    })
+    .from(kwtSettlements)
+    .where(isNull(kwtSettlements.paidAt))
+    .groupBy(kwtSettlements.kwtId);
+  const outstandingByKwt = new Map(
+    outstanding.map((o) => [o.kwtId, { amount: Number(o.amount), n: Number(o.n) }]),
+  );
+
+  return rows.map((r) => {
+    const open = outstandingByKwt.get(r.kwtId);
+    return {
+      kwtId: r.kwtId,
+      kwtName: r.kwtName,
+      hasPaymentChannel: Boolean(r.hasPaymentChannel),
+      unbilledAmount: Number(r.unbilledAmount),
+      unbilledCount: Number(r.unbilledCount),
+      outstandingAmount: open?.amount ?? 0,
+      outstandingCount: open?.n ?? 0,
+      totalAmount: Number(r.totalAmount),
+      lastBilledAt: r.lastBilledAt ? new Date(r.lastBilledAt) : null,
+    };
+  });
 }
 
-/** Fee yang belum tercairkan untuk satu KWT (untuk aksi pencairan). */
-export async function getUnsettledFees(kwtId: string): Promise<{
+/** Biaya layanan yang belum ditagih untuk satu KWT (dasar pembuatan tagihan). */
+export async function getUnbilledFees(kwtId: string): Promise<{
   amount: number;
   count: number;
 }> {
@@ -299,8 +322,28 @@ export async function getUnsettledFees(kwtId: string): Promise<{
   return { amount: Number(agg?.amount ?? 0), count: Number(agg?.n ?? 0) };
 }
 
-/** Riwayat pencairan fee terbaru lintas KWT. */
-export async function listSettlementHistory(limit = 20) {
+/**
+ * Tagihan biaya layanan yang belum dilunasi KWT, dikelompokkan per KWT.
+ * Dipakai halaman /admin/settlement untuk tombol "Tandai lunas".
+ */
+export async function listOpenFeeBills() {
+  return db
+    .select({
+      id: kwtSettlements.id,
+      kwtId: kwtSettlements.kwtId,
+      amount: kwtSettlements.amount,
+      feeCount: kwtSettlements.feeCount,
+      note: kwtSettlements.note,
+      settledThrough: kwtSettlements.settledThrough,
+      createdAt: kwtSettlements.createdAt,
+    })
+    .from(kwtSettlements)
+    .where(isNull(kwtSettlements.paidAt))
+    .orderBy(kwtSettlements.createdAt);
+}
+
+/** Tagihan biaya layanan terbaru lintas KWT (termasuk yang belum lunas). */
+export async function listFeeBillHistory(limit = 20) {
   return db
     .select({
       id: kwtSettlements.id,
@@ -309,7 +352,9 @@ export async function listSettlementHistory(limit = 20) {
       feeCount: kwtSettlements.feeCount,
       method: kwtSettlements.method,
       reference: kwtSettlements.reference,
+      note: kwtSettlements.note,
       settledThrough: kwtSettlements.settledThrough,
+      paidAt: kwtSettlements.paidAt,
       createdAt: kwtSettlements.createdAt,
     })
     .from(kwtSettlements)

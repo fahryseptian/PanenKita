@@ -59,13 +59,23 @@ npm run db:seed
 | `FONTE_TOKEN` | ⬜ | Token device console.fonnte.com | Kosong = WA nonaktif, app tetap jalan |
 | `RESEND_API_KEY` | ⬜ | Dashboard Resend → API Keys | Kosong = email transaksional nonaktif (reset sandi tetap jalan via WA) |
 | `EMAIL_FROM` | ⬜ | `PanenKita <notifikasi@domainAnda.id>` | Wajib setelah domain diverifikasi; default `onboarding@resend.dev` (hanya bisa ke email pemilik akun) |
-| `MIDTRANS_SERVER_KEY` | ⬜ | Dashboard sandbox/production Midtrans | Kosong = bayar online nonaktif |
-| `MIDTRANS_CLIENT_KEY` | ⬜ | Pasangan server key | Untuk Snap.js di klien |
-| `MIDTRANS_IS_PRODUCTION` | ⬜ | `true` jika production key | Default sandbox |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ⬜ | Google Cloud Console | Kosong = login Google hilang |
 | `OPEN_DATA_API_KEY` | ⬜ | `openssl rand -hex 24` | Kosong = open data nonaktif (501) |
 | `API_INDONESIA_KEY` | ⬜ | dashboard.apiindonesia.id | Kosong = dropdown wilayah tetap jalan dari cache DB; bisa juga diisi di `/admin/pengaturan` |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` / `AWS_ENDPOINT_URL_S3` / `NEON_UPLOADS_BUCKET` | ⬜ | Kredensial S3-compatible (Neon Object Storage) | Kosong = unggah foto produk nonaktif |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` / `AWS_ENDPOINT_URL_S3` / `NEON_UPLOADS_BUCKET` | ⬜ | Kredensial S3-compatible (Neon Object Storage) | Kosong = unggah foto produk/QRIS nonaktif (masih bisa tempel tautan) |
+
+> **Model pembayaran (penting):** PanenKita **tidak memegang uang pembeli** dan
+> tidak punya kanal pembayaran sendiri. Pembeli membayar **langsung ke KWT**
+> (tunai saat mengambil, transfer ke rekening KWT, atau scan QRIS KWT). Karena
+> itu **tidak ada `MIDTRANS_*`** — kanal pembayaran platform sudah dihapus.
+> Pengurus mengisi rekening/QRIS di **dashboard → Pengaturan → Pembayaran dari
+> pembeli**, dan pembeli melihatnya di halaman pesanan.
+>
+> Pendapatan platform berasal dari **biaya layanan per transaksi terbayar**
+> (komisi + handling, `platform_fees`) yang **ditagihkan ke KWT** — bukan
+> dipotong dari uang pembeli. Buat tagihan & tandai lunas di
+> `/admin/settlement`; tujuan transfer pelunasan diatur di
+> `/admin/pengaturan → Rekening platform`.
 
 > **Perilaku cron sejak pembaruan:** bila `CRON_SHARED_SECRET` kosong di
 > produksi, `/api/orders/expire` dan `/api/pricing/recompute` **menolak semua
@@ -108,11 +118,18 @@ npm run db:seed
    belum tampil di `/katalog` sampai disetujui di `/admin/kwt` (pembuatnya
    otomatis dikabari lewat WhatsApp bila nomornya terdaftar).
 
-5. Operasional ledger fee platform:
-   - **Pencairan** dicatat di `/admin/settlement`: pilih KWT, isi **cara**
-     (transfer/tunai/otomatis) + **nomor referensi transfer**, lalu simpan
-     rekening KWT di kartu yang sama. Baris fee yang dibalik karena
-     refund/pembatalan tidak ikut dihitung.
+5. Operasional biaya layanan (arah dana: KWT → platform):
+   - **Rekening platform** diisi di `/admin/pengaturan` → *Rekening platform*
+     (tujuan transfer pelunasan; tampil di halaman tagihan).
+   - **Terbitkan tagihan** di `/admin/settlement`: kartu per KWT menampilkan
+     biaya layanan yang belum ditagih; tombol *Buat tagihan* mengunci jumlah itu
+     menjadi satu tagihan. Baris fee yang dibalik karena refund/pembatalan tidak
+     ikut dihitung.
+   - **Tandai lunas** pada tagihan terbuka setelah uang masuk, sekaligus catat
+     **cara** (transfer/tunai/otomatis) + **nomor referensi**.
+   - **Kanal bayar KWT** (rekening/QRIS pembeli) diisi pengurus di
+     `/dashboard/pengaturan`; halaman tagihan memperingatkan KWT yang belum
+     mengisinya karena pembelinya tidak melihat petunjuk bayar.
    - **Sinkronisasi ledger**: bila ada pesanan terbayar yang fee-nya belum
      tercatat, `/admin` menampilkan peringatan kuning dengan tombol
      *Sinkronkan ledger fee* (idempoten). Dari CLI:
@@ -121,7 +138,8 @@ npm run db:seed
      npm run backfill:fees                # catat yang hilang
      ```
    - Ekspor CSV `/api/admin/export?type=fees` menyertakan kolom `Status`
-     (Aktif/Dibatalkan) supaya jejak audit refund tetap utuh.
+     (Aktif/Dibatalkan) supaya jejak audit refund tetap utuh, dan
+     `?type=settlements` mengekspor tagihan beserta status Lunas/Belum dibayar.
 
 6. Uji cepat:
    - `/` landing + `/katalog` direktori tampil
@@ -166,15 +184,23 @@ Daftarkan ke UptimeRobot/BetterStack untuk monitoring gratis.
 
 ---
 
-## 5. Midtrans production nanti
+## 5. Pembayaran online per KWT (rencana berikutnya)
 
-Saat sudah siap menerima pembayaran online:
+Saat ini pembeli membayar langsung ke KWT (tunai/transfer/QRIS), sehingga
+platform tidak menyimpan uang siapa pun. Bila nanti satu KWT ingin menerima
+pembayaran online otomatis:
 
-1. Verifikasi identitas di **dashboard.midtrans.com** (production).
-2. Isi `MIDTRANS_*` env dengan **production keys** + `MIDTRANS_IS_PRODUCTION=true`.
-3. **Settings → Configuration → Payment Notification URL**:
-   `https://<domain>/api/payment/webhook`
-4. Tombol "Bayar online" otomatis muncul di katalog (kondisional `isMidtransEnabled()`).
+1. KWT membuat akun penyedia pembayaran **atas namanya sendiri** (merchant of
+   record = KWT), lalu menyimpan kredensialnya **per KWT** — bukan satu kunci
+   global di env platform.
+2. Webhook penyedia menandai pesanan lunas; biaya layanan platform tetap
+   ditagihkan lewat `/admin/settlement` seperti sekarang.
+
+Jangan menyalakan kanal pembayaran level platform: itu membuat platform
+memegang dana KWT (rekonsiliasi, refund, dan soal perizinan).
+
+Untuk volume besar, opsi paling praktis adalah **QRIS statis milik KWT**
+(sudah didukung: gambar QRIS diunggah di dashboard).
 
 ## 6. Fonnte (WhatsApp) nanti
 

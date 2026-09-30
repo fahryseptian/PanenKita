@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { checkCronAuth } from "../src/lib/cron-auth";
@@ -78,21 +78,37 @@ describe("KWT moderation lifecycle", () => {
   });
 });
 
-describe("fee settlement", () => {
+describe("tagihan biaya layanan (KWT → platform)", () => {
   const actions = read("src/lib/actions/superadmin.ts");
   const queries = read("src/lib/admin-queries.ts");
 
-  it("records settlements from unsettled fees only", () => {
-    expect(actions).toContain("recordSettlement");
+  it("menerbitkan tagihan dari biaya layanan yang belum ditagih", () => {
+    expect(actions).toContain("createFeeBill");
     expect(actions).toContain("settledThrough");
     expect(queries).toContain("kwt_settlements");
-    expect(queries).toContain("unsettledAmount");
+    expect(queries).toContain("unbilledAmount");
+    expect(queries).toContain("getUnbilledFees");
   });
 
-  it("exposes a settlement page with history", () => {
+  it("menandai tagihan lunas secara idempoten", () => {
+    expect(actions).toContain("markFeeBillPaid");
+    expect(actions).toContain("paidAt: new Date()");
+    expect(actions).toContain("isNull(kwtSettlements.paidAt)");
+  });
+
+  it("menyimpan rekening platform sebagai tujuan pelunasan", () => {
+    expect(actions).toContain("savePlatformBankAccount");
+    expect(read("src/lib/app-settings.ts")).toContain("getPlatformBank");
+    expect(read("src/app/admin/pengaturan/page.tsx")).toContain(
+      "savePlatformBankAccount",
+    );
+  });
+
+  it("menampilkan halaman tagihan beserta riwayatnya", () => {
     const page = read("src/app/admin/settlement/page.tsx");
-    expect(page).toContain("recordSettlement");
-    expect(page).toContain("Riwayat pencairan");
+    expect(page).toContain("createFeeBill");
+    expect(page).toContain("markFeeBillPaid");
+    expect(page).toContain("Riwayat tagihan");
   });
 });
 
@@ -155,7 +171,6 @@ describe("PWA on iOS", () => {
 describe("platform fee ledger", () => {
   const fees = read("src/lib/fees-db.ts");
   const orders = read("src/lib/actions/orders.ts");
-  const webhook = read("src/app/api/payment/webhook/route.ts");
   const adminQueries = read("src/lib/admin-queries.ts");
   const superadmin = read("src/lib/actions/superadmin.ts");
   const exportRoute = read("src/app/api/admin/export/route.ts");
@@ -166,21 +181,17 @@ describe("platform fee ledger", () => {
     expect(orders).toContain("PAID_ORDER_STATUSES");
   });
 
-  it("reverses the fee on a Midtrans refund of a paid order", () => {
-    expect(webhook).toContain("reversePlatformFee");
-    expect(webhook).toContain("wasPaid");
-  });
-
   it("keeps reversed rows as an audit trail and restores them on re-payment", () => {
     expect(fees).toContain("reversedAt");
     expect(fees).toContain("restorePlatformFee");
     expect(fees).toContain("reversedReason");
   });
 
-  it("excludes reversed rows from revenue aggregates and settlements", () => {
+  it("excludes reversed rows from revenue aggregates and billing", () => {
     expect(adminQueries).toContain("isNull(platformFees.reversedAt)");
     expect(adminQueries).toContain("pf.reversed_at is null");
-    expect(superadmin).toContain("isNull(platformFees.reversedAt)");
+    // Tagihan hanya menjumlahkan biaya layanan aktif (lewat getUnbilledFees).
+    expect(superadmin).toContain("getUnbilledFees");
   });
 
   it("exports fee rows with their reversal status", () => {
@@ -189,13 +200,11 @@ describe("platform fee ledger", () => {
     expect(exportRoute).toContain("Referensi");
   });
 
-  it("records how each settlement was paid", () => {
+  it("records how each bill was paid", () => {
     expect(superadmin).toContain("SETTLEMENT_METHODS");
-    expect(superadmin).toContain("saveKwtBankAccount");
-    expect(superadmin).toContain("bankAccountNumber");
-    expect(read("src/app/admin/settlement/page.tsx")).toContain(
-      "saveKwtBankAccount",
-    );
+    expect(superadmin).toContain("markFeeBillPaid");
+    expect(superadmin).toContain("reference");
+    expect(read("src/lib/db/schema.ts")).toContain("paidAt");
     expect(read("src/lib/settlement.ts")).toContain("SETTLEMENT_METHODS");
   });
 
@@ -207,5 +216,44 @@ describe("platform fee ledger", () => {
     expect(fees).toContain("countFeeLedgerDrift");
     expect(read("src/app/api/health/route.ts")).toContain("feeLedgerDrift");
     expect(read("scripts/backfill-fees.ts")).toContain("backfillPlatformFees");
+  });
+});
+
+describe("pembeli membayar langsung ke KWT", () => {
+  const exists = (p: string) => existsSync(path.resolve(__dirname, "..", p));
+
+  it("tidak menyisakan kanal pembayaran di sisi platform", () => {
+    expect(exists("src/lib/midtrans.ts")).toBe(false);
+    expect(exists("src/app/api/payment/snap/route.ts")).toBe(false);
+    expect(exists("src/app/api/payment/webhook/route.ts")).toBe(false);
+    expect(
+      exists("src/app/katalog/[slug]/pesan/[orderId]/pay-button.tsx"),
+    ).toBe(false);
+  });
+
+  it("menyimpan kanal bayar KWT dan menampilkannya ke pembeli", () => {
+    const schema = read("src/lib/db/schema.ts");
+    expect(schema).toContain("qrisImageUrl");
+    expect(schema).toContain("paymentNote");
+    expect(read("src/lib/actions/kwt.ts")).toContain("saveKwtPaymentInfo");
+    const orderPage = read("src/app/katalog/[slug]/pesan/[orderId]/page.tsx");
+    expect(orderPage).toContain("Cara bayar");
+    expect(orderPage).toContain("bankAccountLine");
+  });
+
+  it("mengirim link halaman pesanan + petunjuk bayar di struk WA", () => {
+    const orders = read("src/lib/actions/orders.ts");
+    expect(orders).toContain("paymentHintOf");
+    expect(orders).toContain("orderUrl");
+    expect(read("src/lib/wa.ts")).toContain("paymentHint");
+  });
+
+  it("mendorong pengurus melengkapi kanal bayarnya", () => {
+    expect(read("src/app/dashboard/pengaturan/page.tsx")).toContain(
+      "PaymentSettings",
+    );
+    expect(read("src/app/admin/settlement/page.tsx")).toContain(
+      "Kanal bayar pembeli belum diisi",
+    );
   });
 });

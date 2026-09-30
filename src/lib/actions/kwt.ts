@@ -213,6 +213,59 @@ export async function updateKwtProfile(formData: FormData): Promise<void> {
 }
 
 /**
+ * Simpan kanal pembayaran KWT untuk pembeli (rekening, QRIS, catatan).
+ * PanenKita tidak memegang uang: data inilah yang dipakai pembeli untuk
+ * membayar langsung ke KWT, dan ditampilkan di halaman pesanan.
+ * Ketua & bendahara boleh mengubah (bukan hanya ketua seperti profil).
+ */
+export async function saveKwtPaymentInfo(formData: FormData): Promise<void> {
+  const ctx = await requireAdmin();
+  const text = (name: string, max: number): string | null => {
+    const v = String(formData.get(name) ?? "").trim();
+    return v ? v.slice(0, max) : null;
+  };
+
+  const bankName = text("bankName", 60);
+  const bankAccountNumber = text("bankAccountNumber", 40);
+  const bankAccountHolder = text("bankAccountHolder", 80);
+  const paymentNote = text("paymentNote", 300);
+  const qrisImageUrl = text("qrisImageUrl", 500);
+
+  // Rekening harus lengkap: nomor tanpa nama bank tidak bisa dipakai pembeli.
+  if (bankAccountNumber && !bankName) {
+    redirect(
+      `/dashboard/pengaturan?error=${encodeURIComponent("Nama bank wajib diisi bila ada nomor rekening")}`,
+    );
+  }
+
+  // QRIS hanya menerima key bucket (hasil unggah) atau tautan http(s).
+  const qrisValid =
+    !qrisImageUrl ||
+    /^https?:\/\//i.test(qrisImageUrl) ||
+    /^qris\/[A-Za-z0-9-]+\.(jpg|jpeg|png|webp)$/.test(qrisImageUrl);
+  if (!qrisValid) {
+    redirect(
+      `/dashboard/pengaturan?error=${encodeURIComponent("Tautan QRIS tidak valid")}`,
+    );
+  }
+
+  await db
+    .update(kwts)
+    .set({
+      bankName,
+      bankAccountNumber,
+      bankAccountHolder,
+      qrisImageUrl,
+      paymentNote,
+    })
+    .where(eq(kwts.id, ctx.kwtId));
+
+  revalidatePath("/dashboard/pengaturan");
+  revalidatePath(`/katalog/${ctx.kwtSlug}`);
+  redirect("/dashboard/pengaturan?sukses=pembayaran");
+}
+
+/**
  * Simpan token Fonnte (WA) di app_settings — admin KWT bisa mengaturnya sendiri
  * tanpa akses dashboard Vercel. Nilai tidak pernah dikirim balik ke browser.
  */

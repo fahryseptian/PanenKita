@@ -93,7 +93,7 @@ export default async function CatalogPage({ params, searchParams }: Props) {
         <h1 className="text-2xl font-bold">Hasil panen hari ini 🌾</h1>
         <p className="mt-1 text-sm text-slate-500">
           Harga menyesuaikan stok & permintaan — selalu jujur dan transparan.
-          Pesan langsung, bayar di tempat atau online.
+          Pesan langsung; bayar di tempat, transfer, atau QRIS ke kelompok.
         </p>
 
         {items.length === 0 ? (
