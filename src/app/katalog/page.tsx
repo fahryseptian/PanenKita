@@ -77,30 +77,30 @@ export default async function KatalogIndexPage({
             <Leaf className="h-4 w-4" />
           </span>
           <span className="font-bold">PanenKita</span>
-          <Link
-            href="/login"
-            className="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
+          <Link href="/login" className="btn btn-neutral btn-sm ml-auto">
             Masuk
           </Link>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-10">
-        <section className="rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50 to-white p-6">
-          <h1 className="text-2xl font-bold">Katalog Kelompok Tani Wanita</h1>
-          <p className="mt-1 text-sm text-slate-600">
+        <section className="card card-pad border-brand-100 bg-gradient-to-br from-brand-50 to-white">
+          <h1 className="text-2xl font-bold tracking-tight">
+            Katalog Kelompok Tani Wanita
+          </h1>
+          <p className="mt-1.5 text-sm text-slate-600">
             Belanja langsung dari kelompok tani wanita di seluruh Indonesia —
-            panen segar, harga jujur dan transparan.
+            panen segar, harga jujur dan transparan. Pembayaran langsung ke
+            kelompok, tanpa perantara.
           </p>
-          <div className="mt-4 flex flex-wrap gap-4 text-sm">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 font-medium text-brand-700 shadow-sm">
+          <div className="mt-4 flex flex-wrap gap-2.5">
+            <span className="stat-pill">
               <Leaf className="h-3.5 w-3.5" /> {stats.kwtCount} kelompok
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 font-medium text-brand-700 shadow-sm">
+            <span className="stat-pill">
               <Sprout className="h-3.5 w-3.5" /> {stats.productCount} produk
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 font-medium text-brand-700 shadow-sm">
+            <span className="stat-pill">
               <Users className="h-3.5 w-3.5" /> {stats.memberCount} anggota
             </span>
           </div>
@@ -113,7 +113,8 @@ export default async function KatalogIndexPage({
               name="q"
               defaultValue={q ?? ""}
               placeholder="Cari kelompok, kabupaten/kota, atau provinsi..."
-              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              aria-label="Cari kelompok"
+              className="field-search"
             />
           </div>
           {provinsi && <input type="hidden" name="provinsi" value={provinsi} />}
@@ -122,10 +123,7 @@ export default async function KatalogIndexPage({
           {onlyAvailable && (
             <input type="hidden" name="tersedia" value="1" />
           )}
-          <button
-            type="submit"
-            className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
-          >
+          <button type="submit" className="btn btn-primary btn-md shrink-0">
             Cari
           </button>
         </form>
@@ -144,11 +142,7 @@ export default async function KatalogIndexPage({
                   href={`/katalog${
                     active ? qs({ kategori: undefined }) : qs({ kategori: c })
                   }`}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                    active
-                      ? "bg-brand-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
-                  }`}
+                  className={`chip ${active ? "chip-active" : ""}`}
                 >
                   {categoryLabel(c)}
                 </Link>
@@ -156,11 +150,7 @@ export default async function KatalogIndexPage({
             })}
             <Link
               href={`/katalog${availableQs}`}
-              className={`ml-2 rounded-full px-3 py-1 text-xs font-medium transition ${
-                onlyAvailable
-                  ? "bg-brand-600 text-white"
-                  : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
-              }`}
+              className={`chip ml-2 ${onlyAvailable ? "chip-active" : ""}`}
             >
               Hanya tersedia
             </Link>
@@ -195,11 +185,7 @@ export default async function KatalogIndexPage({
                         ? qs({ kabupaten: undefined })
                         : qs({ kabupaten: r.regency })
                     }`}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                      active
-                        ? "bg-brand-600 text-white"
-                        : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
-                    }`}
+                    className={`chip ${active ? "chip-active" : ""}`}
                   >
                     {r.regency} ({r.kwtCount})
                   </Link>
@@ -233,7 +219,7 @@ export default async function KatalogIndexPage({
                 <Link
                   key={p.id}
                   href={`/katalog/${p.kwtSlug}`}
-                  className="w-40 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-brand-300 hover:shadow-sm"
+                  className="w-40 shrink-0 overflow-hidden card card-hover"
                 >
                   <div className="flex h-20 items-center justify-center bg-brand-50">
                     {photoSrc(p.photoUrl) ? (
@@ -272,7 +258,7 @@ export default async function KatalogIndexPage({
         )}
 
         {shownGroups.length === 0 ? (
-          <p className="mt-10 rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-500">
+          <p className="card mt-10 border-dashed border-slate-300 p-12 text-center text-sm text-slate-500">
             {onlyAvailable
               ? "Tidak ada kelompok dengan stok tersedia saat ini. Coba hapus filter."
               : "Belum ada kelompok yang cocok. Coba kata kunci lain."}
@@ -285,16 +271,13 @@ export default async function KatalogIndexPage({
           </div>
         )}
 
-        <section className="mt-10 rounded-2xl border border-dashed border-brand-300 bg-brand-50/50 p-6 text-center">
-          <h2 className="font-semibold">Punya kelompok tani wanita?</h2>
+        <section className="card mt-10 border-dashed border-brand-300 bg-brand-50/50 p-8 text-center">
+          <h2 className="text-lg font-semibold">Punya kelompok tani wanita?</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">
             Daftarkan kelompok Anda, catat panen, dan katalog online langsung
             tampil di sini — gratis.
           </p>
-          <Link
-            href="/daftar-kwt"
-            className="mt-4 inline-block rounded-xl bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
-          >
+          <Link href="/daftar-kwt" className="btn btn-primary btn-md mt-5">
             Daftarkan KWT Anda
           </Link>
         </section>

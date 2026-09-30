@@ -8,7 +8,7 @@ export function GroupCard({ group }: { group: DirectoryRow }) {
   return (
     <Link
       href={`/katalog/${group.slug}`}
-      className="rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-brand-300 hover:shadow-sm"
+      className="card card-pad card-hover block"
     >
       <h2 className="font-semibold">{group.name}</h2>
       <p className="mt-1 flex items-center gap-1 text-sm text-slate-500">
@@ -44,11 +44,7 @@ export function ProvinceChip({
   return (
     <Link
       href={`/katalog/provinsi/${provinceSlug(province)}`}
-      className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-        active
-          ? "bg-brand-600 text-white"
-          : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
-      }`}
+      className={`chip ${active ? "chip-active" : ""}`}
     >
       {province}
       {typeof kwtCount === "number" ? ` (${kwtCount})` : ""}

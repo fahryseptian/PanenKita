@@ -21,24 +21,22 @@ export function JoinForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-3">
       <div>
-        <label htmlFor="inviteCode" className="mb-1 block text-sm font-medium text-slate-700">
+        <label htmlFor="inviteCode" className="field-label">
           Kode undangan
         </label>
         <input
           id="inviteCode"
           name="inviteCode"
           required
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 uppercase tracking-widest outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+          className="field uppercase tracking-widest"
           placeholder="MIS. MEKAR2026"
         />
       </div>
-      {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="field-error">{error}</p>}
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-lg bg-brand-600 py-2.5 font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+        className="btn btn-primary btn-md btn-block"
       >
         {submitting ? "Memproses..." : "Gabung"}
       </button>

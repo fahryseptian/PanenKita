@@ -86,9 +86,9 @@ export default async function CekPesananPage({
           pakai saat memesan.
         </p>
 
-        <form method="get" className="mt-5 space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+        <form method="get" className="card card-pad mt-5 space-y-4">
           <div>
-            <label htmlFor="nomor" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="nomor" className="field-label">
               Nomor pesanan
             </label>
             <input
@@ -97,11 +97,11 @@ export default async function CekPesananPage({
               required
               defaultValue={orderNumber ?? ""}
               placeholder="PK-..."
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 uppercase outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              className="field uppercase"
             />
           </div>
           <div>
-            <label htmlFor="hp" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="hp" className="field-label">
               Nomor WhatsApp
             </label>
             <input
@@ -111,26 +111,23 @@ export default async function CekPesananPage({
               inputMode="tel"
               defaultValue={hp ?? ""}
               placeholder="081234567890"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              className="field"
             />
           </div>
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-brand-600 py-2.5 font-semibold text-white hover:bg-brand-700"
-          >
+          <button type="submit" className="btn btn-primary btn-lg btn-block">
             Cari pesanan
           </button>
         </form>
 
         {notFound && (
-          <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+          <p className="field-error mt-4">
             Pesanan tidak ditemukan. Pastikan nomor pesanan dan nomor WhatsApp sesuai
             saat memesan.
           </p>
         )}
 
         {result && status && (
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-6 text-center">
+          <div className="card card-pad mt-5 text-center">
             <p className="text-sm text-slate-500">{result.kwtName}</p>
             <h2 className="mt-1 text-lg font-bold">{result.orderNumber}</h2>
             <span className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-medium ${status.cls}`}>

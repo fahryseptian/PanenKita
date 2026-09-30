@@ -25,11 +25,11 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   description:
-    "Platform katalog panen untuk KWT: stok & harga selalu segar, harga dinamis yang transparan, notifikasi WhatsApp instan, pembayaran digital.",
+    "Platform katalog panen untuk KWT: stok & harga selalu segar, harga dinamis yang transparan, notifikasi WhatsApp instan, dan pembayaran langsung ke kelompok.",
   openGraph: {
     title: `${productName} — Katalog panen KWT`,
     description:
-      "Belanja hasil panen langsung dari Kelompok Tani Wanita. Harga jujur, stok segar setiap hari.",
+      "Belanja hasil panen langsung dari Kelompok Tani Wanita. Harga jujur, stok segar setiap hari, bayar langsung ke kelompok.",
     url: appUrl,
     siteName: productName,
     type: "website",

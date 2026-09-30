@@ -66,7 +66,7 @@ export default async function OrderPage({ params }: Props) {
   return (
     <div className="min-h-screen bg-slate-50">
       <main className="mx-auto max-w-md px-4 py-12">
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+        <div className="card p-8 text-center">
           <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${status.cls}`}>
             {order.status === "pending" ? (
               <Clock className="h-7 w-7" />
@@ -77,7 +77,7 @@ export default async function OrderPage({ params }: Props) {
             )}
           </span>
           <h1 className="mt-4 text-xl font-bold">Pesanan {order.orderNumber}</h1>
-          <span className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-medium ${status.cls}`}>
+          <span className={`badge mt-2 px-3 py-1 text-sm ${status.cls}`}>
             {status.text}
           </span>
 
@@ -112,7 +112,7 @@ export default async function OrderPage({ params }: Props) {
           )}
 
           {order.status === "pending" && (
-            <section className="mt-5 rounded-xl border border-brand-100 bg-brand-50/60 p-4 text-left">
+            <section className="card mt-5 border-brand-100 bg-brand-50/60 p-4 text-left">
               <p className="flex items-center gap-2 text-sm font-semibold text-brand-800">
                 <Landmark className="h-4 w-4" /> Cara bayar
               </p>
@@ -167,7 +167,7 @@ export default async function OrderPage({ params }: Props) {
                   href={`https://wa.me/${contact.phone}?text=${waText}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 text-sm font-semibold text-white hover:bg-brand-700"
+                  className="btn btn-primary btn-lg btn-block mt-3"
                 >
                   <MessageCircle className="h-4 w-4" />
                   Konfirmasi bukti bayar ke {contact.name}

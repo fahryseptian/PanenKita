@@ -28,3 +28,158 @@
 body {
   @apply antialiased;
 }
+
+/* ---------------------------------------------------------------------------
+   Primitives UI (tombol, kartu, field, chip) — satu sumber kebenaran untuk
+   halaman publik & dashboard supaya tampilan konsisten.
+   --------------------------------------------------------------------------- */
+@layer components {
+  /* Wadah halaman: lebar & padding seragam di seluruh halaman publik. */
+  .container-page {
+    @apply mx-auto w-full max-w-5xl px-4 sm:px-6;
+  }
+
+  /* --- Tombol --- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold
+      transition duration-150 disabled:cursor-not-allowed disabled:opacity-50
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300;
+  }
+  .btn-sm {
+    @apply px-3.5 py-2 text-sm;
+  }
+  .btn-md {
+    @apply px-5 py-2.5 text-sm;
+  }
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+  .btn-block {
+    @apply w-full;
+  }
+  .btn-primary {
+    @apply bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:shadow;
+  }
+  .btn-secondary {
+    @apply border border-brand-200 bg-white text-brand-700 hover:border-brand-300 hover:bg-brand-50;
+  }
+  .btn-soft {
+    @apply bg-brand-50 text-brand-700 hover:bg-brand-100;
+  }
+  .btn-neutral {
+    @apply border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800;
+  }
+  .btn-dark {
+    @apply bg-slate-800 text-white hover:bg-slate-900;
+  }
+  .btn-ghost {
+    @apply text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+  }
+  .btn-danger-ghost {
+    @apply text-red-600 hover:bg-red-50;
+  }
+
+  /* --- Kartu --- */
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white;
+  }
+  .card-pad {
+    @apply p-5 sm:p-6;
+  }
+  .card-hover {
+    @apply transition duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md;
+  }
+
+  /* --- Form --- */
+  .field {
+    @apply block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm
+      text-slate-900 outline-none transition placeholder:text-slate-400
+      focus:border-brand-500 focus:ring-2 focus:ring-brand-100;
+  }
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-slate-700;
+  }
+  /* Field dengan ikon di kiri (mis. pencarian). */
+  .field-search {
+    @apply block w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm
+      text-slate-900 outline-none transition placeholder:text-slate-400
+      focus:border-brand-500 focus:ring-2 focus:ring-brand-100;
+  }
+  .field-hint {
+    @apply mt-1.5 text-xs text-slate-400;
+  }
+  .field-error {
+    @apply rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600;
+  }
+  .field-success {
+    @apply rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-700;
+  }
+
+  /* --- Chip & badge --- */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white
+      px-3 py-1 text-xs font-medium text-slate-600 transition
+      hover:border-brand-300 hover:text-brand-700;
+  }
+  .chip-active {
+    @apply border-transparent bg-brand-600 text-white hover:bg-brand-700 hover:text-white;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .badge-brand {
+    @apply bg-brand-50 text-brand-700;
+  }
+  .badge-warn {
+    @apply bg-amber-50 text-amber-700;
+  }
+  .badge-muted {
+    @apply bg-slate-100 text-slate-500;
+  }
+  .badge-danger {
+    @apply bg-red-50 text-red-600;
+  }
+  /* Pil statistik (angka ringkas di atas katalog). */
+  .stat-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-sm
+      font-medium text-brand-700 shadow-sm;
+  }
+}
+
+/* --- Animasi masuk halus (dihormati prefers-reduced-motion) --- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise {
+    animation: none;
+  }
+}
+
+/* Latar lembut untuk hero: cahaya hijau + kisi tipis. */
+.hero-surface {
+  background-image:
+    radial-gradient(60rem 30rem at 15% -10%, rgba(34, 197, 94, 0.16), transparent 65%),
+    radial-gradient(45rem 25rem at 100% 0%, rgba(21, 128, 61, 0.1), transparent 60%),
+    linear-gradient(to bottom, #ffffff, #f8fafc);
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(to right, rgba(15, 23, 42, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(38rem 22rem at 50% 0%, #000 25%, transparent 75%);
+}
