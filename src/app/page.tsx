@@ -19,8 +19,8 @@ const FEATURES = [
   },
   {
     icon: Wallet,
-    title: "Pembayaran digital",
-    desc: "QRIS, e-wallet, dan transfer via Midtrans Snap — konfirmasi otomatis.",
+    title: "Bayar langsung ke KWT",
+    desc: "Tunai saat ambil, transfer ke rekening KWT, atau scan QRIS — tanpa perantara.",
   },
 ];
 

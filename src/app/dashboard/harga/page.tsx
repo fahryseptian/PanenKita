@@ -80,11 +80,12 @@ export default async function PricingPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-semibold">Komisi platform</h2>
+            <h2 className="font-semibold">Biaya layanan platform</h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              Dipotong otomatis dari transaksi terbayar. Terkumpul sejauh ini:{" "}
-              <b>{formatRupiah(feeSummary.totalFee)}</b> dari {feeSummary.feeCount} transaksi
-              (bersih KWT {formatRupiah(feeSummary.netTotal)}).
+              Dihitung per transaksi terbayar dan ditagihkan berkala ke KWT —{" "}
+              <b>tidak</b> dipotong dari uang pembeli, karena pembeli membayar langsung
+              ke KWT. Terkumpul sejauh ini: <b>{formatRupiah(feeSummary.totalFee)}</b> dari{" "}
+              {feeSummary.feeCount} transaksi.
             </p>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { getKwtById } from "@/lib/queries";
 import { getWaTokenStatus } from "@/lib/app-settings";
 import { getApiIndonesiaKey } from "@/lib/api-indonesia";
 import { listProvinces } from "@/lib/regions-db";
+import { isStorageConfigured } from "@/lib/storage";
 import {
   clearWaToken,
   rotateInviteCode,
@@ -11,6 +12,7 @@ import {
   syncRegionsAction,
   updateKwtProfile,
 } from "@/lib/actions/kwt";
+import { PaymentSettings } from "./payment-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -50,9 +52,15 @@ export default async function KwtSettingsPage({
           Token WA dihapus dari database — kembali ke konfigurasi server (bila ada).
         </p>
       )}
-      {sp.sukses && sp.sukses !== "wa" && sp.sukses !== "wa-clear" && (
+      {sp.sukses &&
+        !["wa", "wa-clear", "api-key", "sync", "pembayaran"].includes(sp.sukses) && (
+          <p className="rounded-lg bg-brand-50 px-4 py-2 text-sm text-brand-700">
+            ✅ Profil kelompok diperbarui.
+          </p>
+        )}
+      {sp.sukses === "pembayaran" && (
         <p className="rounded-lg bg-brand-50 px-4 py-2 text-sm text-brand-700">
-          ✅ Profil kelompok diperbarui.
+          ✅ Kanal pembayaran tersimpan — pembeli melihatnya di halaman pesanan.
         </p>
       )}
       {sp.sukses === "api-key" && (
@@ -134,6 +142,27 @@ export default async function KwtSettingsPage({
             Simpan profil
           </button>
         </form>
+      </section>
+
+      {/* Kanal pembayaran KWT: pembeli membayar langsung ke KWT */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        <h2 className="font-semibold">💳 Pembayaran dari pembeli</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          PanenKita <b>tidak menerima uang</b> pembeli — pembeli membayar langsung
+          ke kelompok (tunai, transfer, atau QRIS). Isi rekening/QRIS di bawah agar
+          petunjuk pembayarannya muncul otomatis di halaman pesanan pembeli, lalu
+          Anda cukup menandai pesanan sudah dibayar di menu Pesanan.
+        </p>
+        <PaymentSettings
+          storageEnabled={isStorageConfigured()}
+          values={{
+            bankName: kwt.bankName ?? "",
+            bankAccountNumber: kwt.bankAccountNumber ?? "",
+            bankAccountHolder: kwt.bankAccountHolder ?? "",
+            qrisImageUrl: kwt.qrisImageUrl ?? "",
+            paymentNote: kwt.paymentNote ?? "",
+          }}
+        />
       </section>
 
       {/* Token WA — diatur admin tanpa akses Vercel */}

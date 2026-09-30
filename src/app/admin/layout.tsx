@@ -10,7 +10,7 @@ export const metadata = { title: "Admin Platform" };
 const ADMIN_NAV = [
   { href: "/admin", label: "Ringkasan" },
   { href: "/admin/kwt", label: "Kelompok KWT" },
-  { href: "/admin/settlement", label: "Pencairan Fee" },
+  { href: "/admin/settlement", label: "Tagihan Fee" },
   { href: "/admin/pengguna", label: "Pengguna" },
   { href: "/admin/pengaturan", label: "Pengaturan" },
 ];

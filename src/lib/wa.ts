@@ -164,7 +164,10 @@ export function orderConfirmMessage(opts: {
   buyerName: string;
   summary: string;
   total: number;
-  payUrl?: string | null;
+  /** Link halaman pesanan (berisi rincian + cara bayar KWT). */
+  orderUrl?: string | null;
+  /** Ringkasan cara bayar KWT, mis. "Transfer ke BRI 123 a/n Sari". */
+  paymentHint?: string | null;
   /** Batas waktu pembayaran (opsional). */
   expiresAt?: Date | null;
 }): string {
@@ -176,10 +179,13 @@ export function orderConfirmMessage(opts: {
     ``,
     `Total: *${formatRupiah(opts.total)}*`,
   ];
-  if (opts.payUrl) {
-    lines.push(``, `Bayar online: ${opts.payUrl}`);
+  if (opts.paymentHint) {
+    lines.push(``, `Bayar: ${opts.paymentHint}`);
   } else {
-    lines.push(``, `Pembayaran diatur dengan pengurus KWT.`);
+    lines.push(``, `Pembayaran diatur dengan pengurus KWT (tunai saat ambil/transfer).`);
+  }
+  if (opts.orderUrl) {
+    lines.push(`Rincian & cara bayar: ${opts.orderUrl}`);
   }
   if (opts.expiresAt) {
     const sampa = new Date(opts.expiresAt).toLocaleString("id-ID", {

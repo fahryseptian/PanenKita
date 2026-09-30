@@ -14,10 +14,24 @@ export function isStorageKey(value: string | null | undefined): value is string 
 
 /** Key yang aman untuk dipakai sebagai nama objek: products/<uuid>.<ext>. */
 export function buildPhotoKey(productId: string, ext: string): string | null {
+  const prefix = "products";
+  return buildKey(prefix, productId, ext);
+}
+
+/** Key gambar QRIS milik KWT: qris/<uuid>.<ext>. */
+export function buildQrisKey(kwtId: string, ext: string): string | null {
+  return buildKey("qris", kwtId, ext);
+}
+
+function buildKey(prefix: string, id: string, ext: string): string | null {
   const clean = ext.replace(/[^a-z0-9]/gi, "").toLowerCase();
   if (!["jpg", "jpeg", "png", "webp"].includes(clean)) return null;
-  return `products/${productId}.${clean}`;
+  if (!/^[A-Za-z0-9-]+$/.test(id)) return null;
+  return `${prefix}/${id}.${clean}`;
 }
+
+/** Prefix key bucket yang boleh disajikan lewat proxy foto. */
+export const PHOTO_KEY_PREFIXES = ["products", "qris"] as const;
 
 /** Validasi MIME type foto yang diizinkan. */
 export function isAllowedPhotoMime(mime: string): boolean {

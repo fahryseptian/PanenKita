@@ -3,13 +3,12 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, count, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   kwtMembers,
   kwtSettlements,
   kwts,
-  platformFees,
   regions,
   user,
   verification,
@@ -18,11 +17,15 @@ import { requireSuperadmin } from "@/lib/session";
 import { kwtApprovedMessage, kwtRejectedMessage, sendWa } from "@/lib/wa";
 import {
   WA_TOKEN_KEY,
+  clearPlatformBank,
   deleteSetting,
+  getPlatformBank,
   getWaTokenStatus,
   maskToken,
+  setPlatformBank,
   setSetting,
 } from "@/lib/app-settings";
+import { getUnbilledFees } from "@/lib/admin-queries";
 import {
   API_INDONESIA_KEY_SETTING,
   getApiIndonesiaKey,
@@ -181,19 +184,51 @@ export async function createResetLinkForUser(formData: FormData): Promise<void> 
   );
 }
 
-/** Cara pencairan fee yang dicatat superadmin (lihat juga src/lib/settlement.ts). */
+/** Cara KWT membayar biaya layanan (lihat juga src/lib/settlement.ts). */
 const SETTLEMENT_METHODS = ["transfer", "tunai", "otomatis"] as const;
 type SettlementMethod = (typeof SETTLEMENT_METHODS)[number];
 
 /**
- * Catat pencairan fee platform untuk satu KWT: jumlahkan seluruh fee aktif yang
- * belum tercakup settlement sebelumnya, simpan baris pencairan (beserta cara dan
- * referensi transfer), kembalikan rekapnya.
+ * Terbitkan tagihan biaya layanan untuk satu KWT: jumlahkan seluruh fee aktif
+ * yang belum tercakup tagihan sebelumnya.
+ *
+ * Arah uang di PanenKita hanya KWT → platform (pembeli membayar langsung ke
+ * KWT), jadi tagihan ini belum lunas sampai KWT mentransfer ke rekening
+ * platform dan superadmin menandainya lewat markFeeBillPaid.
  */
-export async function recordSettlement(formData: FormData): Promise<void> {
+export async function createFeeBill(formData: FormData): Promise<void> {
   const session = await requireSuperadmin();
   const kwtId = String(formData.get("kwtId") ?? "");
   if (!kwtId) return;
+  const note = String(formData.get("note") ?? "").trim() || null;
+
+  const { amount, count: feeCount } = await getUnbilledFees(kwtId);
+  if (amount <= 0) {
+    redirect("/admin/settlement?error=Tidak+ada+biaya+layanan+belum+ditagih");
+  }
+
+  await db.insert(kwtSettlements).values({
+    kwtId,
+    amount,
+    settledThrough: new Date(),
+    feeCount,
+    note,
+    createdBy: session.user.id,
+  });
+
+  revalidatePath("/admin/settlement");
+  revalidatePath("/admin");
+  redirect("/admin/settlement?sukses=tagihan");
+}
+
+/**
+ * Tandai tagihan biaya layanan sudah dilunasi KWT (uang masuk rekening
+ * platform). Idempoten: tagihan yang sudah lunas tidak berubah.
+ */
+export async function markFeeBillPaid(formData: FormData): Promise<void> {
+  await requireSuperadmin();
+  const billId = String(formData.get("billId") ?? "");
+  if (!billId) return;
 
   const rawMethod = String(formData.get("method") ?? "transfer");
   const method: SettlementMethod = (SETTLEMENT_METHODS as readonly string[]).includes(
@@ -204,72 +239,56 @@ export async function recordSettlement(formData: FormData): Promise<void> {
   const reference = String(formData.get("reference") ?? "").trim() || null;
   const note = String(formData.get("note") ?? "").trim() || null;
 
-  const [last] = await db
-    .select({ settledThrough: kwtSettlements.settledThrough })
-    .from(kwtSettlements)
-    .where(eq(kwtSettlements.kwtId, kwtId))
-    .orderBy(sql`${kwtSettlements.settledThrough} desc`)
-    .limit(1);
-
-  // Hanya fee AKTIF (bukan hasil refund/pembatalan) yang boleh dicairkan.
-  const conditions = [
-    eq(platformFees.kwtId, kwtId),
-    isNull(platformFees.reversedAt),
-  ];
-  if (last?.settledThrough) {
-    conditions.push(gt(platformFees.createdAt, last.settledThrough));
-  }
-
-  const [agg] = await db
-    .select({
-      amount: sql<number>`coalesce(sum(${platformFees.totalFee}), 0)::int`,
-      n: count(),
+  await db
+    .update(kwtSettlements)
+    .set({
+      paidAt: new Date(),
+      method,
+      ...(reference ? { reference } : {}),
+      ...(note ? { note } : {}),
     })
-    .from(platformFees)
-    .where(and(...conditions));
-
-  const amount = Number(agg?.amount ?? 0);
-  if (amount <= 0) {
-    redirect("/admin/settlement?error=Tidak+ada+fee+belum+tercairkan");
-  }
-
-  await db.insert(kwtSettlements).values({
-    kwtId,
-    amount,
-    settledThrough: new Date(),
-    feeCount: Number(agg?.n ?? 0),
-    method,
-    reference,
-    note,
-    createdBy: session.user.id,
-  });
+    .where(and(eq(kwtSettlements.id, billId), isNull(kwtSettlements.paidAt)));
 
   revalidatePath("/admin/settlement");
-  redirect("/admin/settlement?sukses=1");
+  revalidatePath("/admin");
+  redirect("/admin/settlement?sukses=lunas");
 }
 
 /**
- * Simpan rekening bank KWT untuk pencairan (diisi superadmin setelah verifikasi
- * data dari pengurus). Kosongkan nilai untuk menghapus.
+ * Simpan rekening platform: tujuan pembayaran biaya layanan oleh KWT.
+ * Ditampilkan di halaman tagihan agar pengurus tahu ke mana harus transfer.
  */
-export async function saveKwtBankAccount(formData: FormData): Promise<void> {
+export async function savePlatformBankAccount(formData: FormData): Promise<void> {
   await requireSuperadmin();
-  const kwtId = String(formData.get("kwtId") ?? "");
-  if (!kwtId) return;
+  const bankName = String(formData.get("bankName") ?? "").trim();
+  const bankAccountNumber = String(formData.get("bankAccountNumber") ?? "").trim();
+  const bankAccountHolder = String(formData.get("bankAccountHolder") ?? "").trim();
 
-  const bankName = String(formData.get("bankName") ?? "").trim() || null;
-  const bankAccountNumber =
-    String(formData.get("bankAccountNumber") ?? "").trim() || null;
-  const bankAccountHolder =
-    String(formData.get("bankAccountHolder") ?? "").trim() || null;
+  if (!bankName || !bankAccountNumber) {
+    redirect(
+      "/admin/pengaturan?error=" + encodeURIComponent("Nama bank & nomor rekening wajib diisi"),
+    );
+  }
 
-  await db
-    .update(kwts)
-    .set({ bankName, bankAccountNumber, bankAccountHolder })
-    .where(eq(kwts.id, kwtId));
-
+  await setPlatformBank({ bankName, bankAccountNumber, bankAccountHolder });
+  revalidatePath("/admin/pengaturan");
   revalidatePath("/admin/settlement");
-  redirect("/admin/settlement?sukses=rekening");
+  redirect("/admin/pengaturan?sukses=rekening-platform");
+}
+
+/** Hapus rekening platform dari database. */
+export async function clearPlatformBankAccount(): Promise<void> {
+  await requireSuperadmin();
+  await clearPlatformBank();
+  revalidatePath("/admin/pengaturan");
+  revalidatePath("/admin/settlement");
+  redirect("/admin/pengaturan?sukses=rekening-platform-clear");
+}
+
+/** Rekening platform untuk halaman pengaturan (bisa kosong). */
+export async function platformBankStatus() {
+  await requireSuperadmin();
+  return getPlatformBank();
 }
 
 /**

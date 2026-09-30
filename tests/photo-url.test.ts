@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   isStorageKey,
   buildPhotoKey,
+  buildQrisKey,
   isAllowedPhotoMime,
   mimeToExt,
+  photoSrc,
+  PHOTO_KEY_PREFIXES,
 } from "../src/lib/photo-url";
 
 describe("isStorageKey", () => {
@@ -27,6 +30,25 @@ describe("buildPhotoKey", () => {
   it("rejects unknown extensions", () => {
     expect(buildPhotoKey("x", ".gif")).toBeNull();
     expect(buildPhotoKey("x", "../etc/passwd")).toBeNull();
+  });
+});
+
+describe("buildQrisKey", () => {
+  it("builds qris/<kwtId>.<ext>", () => {
+    const id = "9a1b2c3d-0000-4000-8000-000000000000";
+    expect(buildQrisKey(id, "jpg")).toBe(`qris/${id}.jpg`);
+  });
+
+  it("rejects unsafe ids and extensions", () => {
+    expect(buildQrisKey("../../etc", "jpg")).toBeNull();
+    expect(buildQrisKey("x", "svg")).toBeNull();
+  });
+
+  it("covers every prefix the upload proxy serves", () => {
+    expect([...PHOTO_KEY_PREFIXES]).toEqual(["products", "qris"]);
+    expect(photoSrc("qris/abc.png")).toBe(
+      "/api/uploads/photo?key=" + encodeURIComponent("qris/abc.png"),
+    );
   });
 });
 

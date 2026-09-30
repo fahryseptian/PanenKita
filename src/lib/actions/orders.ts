@@ -12,7 +12,7 @@ import { sendWa, newOrderMessage, orderPaidMessage, orderConfirmMessage } from "
 import { formatRupiah } from "@/lib/format";
 import { recordPlatformFee, reversePlatformFee } from "@/lib/fees-db";
 import { notifyStockOut } from "@/lib/stock-alerts";
-import { isMidtransEnabled } from "@/lib/midtrans";
+import { paymentHintOf, type KwtPaymentInfo } from "@/lib/payment-info";
 import { appUrl } from "@/lib/app-url";
 import { wholesaleLineTotal, activeTier } from "@/lib/wholesale";
 import { pricingRules } from "@/lib/db/schema";
@@ -35,14 +35,36 @@ function waSummary(
     .join("\n");
 }
 
-/** Slug KWT untuk link halaman pesanan pada pesan pembeli. */
-async function slugOf(kwtId: string): Promise<string | null> {
+/**
+ * Konteks pembayaran KWT: slug (untuk link halaman pesanan) + kanal bayar yang
+ * dipakai pembeli. PanenKita tidak memegang uang, jadi pembeli diarahkan
+ * membayar langsung ke KWT.
+ */
+async function paymentContextOf(
+  kwtId: string,
+): Promise<KwtPaymentInfo & { slug: string | null }> {
   const [row] = await db
-    .select({ slug: kwts.slug })
+    .select({
+      slug: kwts.slug,
+      bankName: kwts.bankName,
+      bankAccountNumber: kwts.bankAccountNumber,
+      bankAccountHolder: kwts.bankAccountHolder,
+      qrisImageUrl: kwts.qrisImageUrl,
+      paymentNote: kwts.paymentNote,
+    })
     .from(kwts)
     .where(eq(kwts.id, kwtId))
     .limit(1);
-  return row?.slug ?? null;
+  return (
+    row ?? {
+      slug: null,
+      bankName: null,
+      bankAccountNumber: null,
+      bankAccountHolder: null,
+      qrisImageUrl: null,
+      paymentNote: null,
+    }
+  );
 }
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 
@@ -173,9 +195,11 @@ export async function placeOrder(
     })),
   );
 
-  // Struk awal ke pembeli (best-effort) + link bayar bila Midtrans aktif.
-  const payUrl = isMidtransEnabled()
-    ? `${appUrl()}/katalog/${slugOf(kwtId) ?? ""}/pesan/${order.id}`
+  // Struk awal ke pembeli (best-effort). Link halaman pesanan selalu dikirim
+  // karena di sana pembeli melihat cara bayar KWT (tunai/transfer/QRIS).
+  const kwtPayment = await paymentContextOf(kwtId);
+  const orderUrl = kwtPayment.slug
+    ? `${appUrl()}/katalog/${kwtPayment.slug}/pesan/${order.id}`
     : null;
   await sendWa(
     "order_created",
@@ -186,7 +210,8 @@ export async function placeOrder(
       buyerName: parsed.data.buyerName,
       summary,
       total,
-      payUrl,
+      orderUrl,
+      paymentHint: paymentHintOf(kwtPayment),
       expiresAt,
     }),
   );

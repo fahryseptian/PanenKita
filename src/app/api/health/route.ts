@@ -17,11 +17,14 @@ const REQUIRED_IN_PRODUCTION = [
   "CRON_SHARED_SECRET",
 ] as const;
 
-/** Fitur opsional: aktif otomatis bila env-nya diisi. */
+/**
+ * Fitur opsional: aktif otomatis bila env-nya diisi.
+ * Catatan: tidak ada kanal pembayaran platform — pembeli membayar langsung ke
+ * KWT, dan rekening KWT diatur dari dashboard (tersimpan di database).
+ */
 const OPTIONAL_FEATURES = {
   whatsapp: "FONTE_TOKEN",
   email: "RESEND_API_KEY",
-  payment: "MIDTRANS_SERVER_KEY",
   uploads: "AWS_ACCESS_KEY_ID",
   googleLogin: "GOOGLE_CLIENT_ID",
   openData: "OPEN_DATA_API_KEY",
