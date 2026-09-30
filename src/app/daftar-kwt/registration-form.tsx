@@ -72,13 +72,12 @@ export function RegistrationForm() {
     setError("Gagal mendaftarkan kelompok — coba lagi");
   }
 
-  const inputCls =
-    "w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
+  const inputCls = "field";
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6">
+    <form onSubmit={onSubmit} className="card card-pad space-y-4">
       <div>
-        <label htmlFor="name" className="mb-1 block text-sm font-medium text-slate-700">
+        <label htmlFor="name" className="field-label">
           Nama kelompok
         </label>
         <input id="name" name="name" required minLength={3} className={inputCls} placeholder="Mis. KWT Srikandi Makmur" />
@@ -89,7 +88,7 @@ export function RegistrationForm() {
           {/* Dropdown resmi dari cache wilayah apiindonesia.id */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="provinceCode" className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="provinceCode" className="field-label">
                 Provinsi
               </label>
               <select
@@ -108,7 +107,7 @@ export function RegistrationForm() {
               </select>
             </div>
             <div>
-              <label htmlFor="regencyCode" className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="regencyCode" className="field-label">
                 Kabupaten/Kota
               </label>
               <select
@@ -144,20 +143,20 @@ export function RegistrationForm() {
       ) : (
         <>
           {regionError !== "manual" && (
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-700">
               Data wilayah resmi belum tersedia — isi manual dulu. Admin dapat mengaktifkan
               dropdown resmi lewat Pengaturan → Sinkron wilayah.
             </p>
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="regency" className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="regency" className="field-label">
                 Kabupaten/Kota
               </label>
               <input id="regency" name="regency" required className={inputCls} placeholder="Mis. Bandung" />
             </div>
             <div>
-              <label htmlFor="province" className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="province" className="field-label">
                 Provinsi <span className="text-slate-400">(opsional)</span>
               </label>
               <input id="province" name="province" className={inputCls} placeholder="Mis. Jawa Barat" />
@@ -167,18 +166,18 @@ export function RegistrationForm() {
       )}
 
       <div>
-        <label htmlFor="address" className="mb-1 block text-sm font-medium text-slate-700">
+        <label htmlFor="address" className="field-label">
           Alamat sekretariat <span className="text-slate-400">(opsional)</span>
         </label>
         <input id="address" name="address" className={inputCls} placeholder="Desa/kelurahan, kecamatan" />
       </div>
 
-      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
 
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-lg bg-brand-600 py-2.5 font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+        className="btn btn-primary btn-lg btn-block"
       >
         {submitting ? "Mendaftarkan..." : "Daftarkan kelompok"}
       </button>

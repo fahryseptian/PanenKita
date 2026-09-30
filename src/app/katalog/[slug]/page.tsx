@@ -81,7 +81,7 @@ export default async function CatalogPage({ params, searchParams }: Props) {
           </div>
           <Link
             href={`/katalog/${kwt.slug}/sertifikat`}
-            className="ml-auto rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+            className="badge badge-brand ml-auto border border-brand-200 px-3 py-1 transition hover:bg-brand-100"
             title="Lihat sertifikat zero-waste KWT ini"
           >
             🌱 Sertifikat Zero-Waste
@@ -97,7 +97,7 @@ export default async function CatalogPage({ params, searchParams }: Props) {
         </p>
 
         {items.length === 0 ? (
-          <div className="mt-10 rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+          <div className="card mt-10 border-dashed border-slate-300 p-12 text-center">
             <Sprout className="mx-auto h-10 w-10 text-brand-600" />
             <p className="mt-3 text-sm text-slate-500">
               Belum ada produk aktif. Pantau lagi nanti ya!
@@ -110,11 +110,7 @@ export default async function CatalogPage({ params, searchParams }: Props) {
               <div className="mt-6 flex flex-wrap items-center gap-1.5">
                 <Link
                   href={`/katalog/${kwt.slug}`}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                    !active
-                      ? "bg-brand-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
-                  }`}
+                  className={`chip ${!active ? "chip-active" : ""}`}
                 >
                   Semua
                 </Link>
@@ -122,11 +118,7 @@ export default async function CatalogPage({ params, searchParams }: Props) {
                   <Link
                     key={c}
                     href={`/katalog/${kwt.slug}?kategori=${c}`}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                      active === c
-                        ? "bg-brand-600 text-white"
-                        : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700"
-                    }`}
+                    className={`chip ${active === c ? "chip-active" : ""}`}
                   >
                     {categoryLabel(c)}
                   </Link>
@@ -183,7 +175,7 @@ function ProductCard({
   const available = Math.max(0, item.stock?.available ?? 0);
   const discounted = item.currentPrice < item.basePrice;
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div className="card card-hover flex h-full flex-col overflow-hidden">
       <div className="flex h-32 items-center justify-center bg-brand-50 text-5xl">
         {photoSrc(item.photoUrl) ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -196,14 +188,12 @@ function ProductCard({
           <span>🥬</span>
         )}
       </div>
-      <div className="p-4">
+      <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold">{item.name}</h3>
           <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-              available > 0
-                ? "bg-brand-50 text-brand-700"
-                : "bg-slate-100 text-slate-400"
+            className={`badge shrink-0 ${
+              available > 0 ? "badge-brand" : "badge-muted"
             }`}
           >
             {available > 0 ? `Stok ${available} ${item.unit}` : "Habis"}
@@ -214,7 +204,7 @@ function ProductCard({
             {item.description}
           </p>
         )}
-        <div className="mt-3 flex items-baseline gap-2">
+        <div className="mt-auto flex items-baseline gap-2 pt-3">
           <span className="text-lg font-bold text-brand-700">
             {formatRupiah(item.currentPrice)}
           </span>

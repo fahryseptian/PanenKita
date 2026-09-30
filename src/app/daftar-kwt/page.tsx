@@ -24,11 +24,7 @@ export default async function RegisterPage({
           Buat katalog online untuk kelompok tani wanita Anda — gratis. Anda akan
           menjadi <b>ketua</b> dan bisa mengundang anggota lewat kode undangan.
         </p>
-        {error && (
-          <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-            {error}
-          </p>
-        )}
+        {error && <p className="field-error mt-4">{error}</p>}
         <div className="mt-6">
           <RegistrationForm />
         </div>

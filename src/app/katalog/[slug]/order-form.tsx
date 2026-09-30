@@ -89,7 +89,7 @@ export function OrderForm({ kwtId, kwtSlug, products }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4 lg:grid-cols-[1fr_320px]">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="card card-pad">
         <div className="space-y-3">
           {products.map((p) => {
             const qty = cart[p.id] ?? 0;
@@ -131,7 +131,7 @@ export function OrderForm({ kwtId, kwtSlug, products }: Props) {
                   </button>
                   <input
                     aria-label={`Jumlah ${p.name}`}
-                    className="w-14 rounded-lg border border-slate-200 px-2 py-1 text-center text-sm"
+                    className="w-14 rounded-lg border border-slate-200 px-2 py-1 text-center text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                     value={qty === 0 ? "" : qty}
                     onChange={(e) => {
                       const v = Number(e.target.value);
@@ -157,7 +157,7 @@ export function OrderForm({ kwtId, kwtSlug, products }: Props) {
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="buyerName" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="buyerName" className="field-label">
               Nama Anda
             </label>
             <input
@@ -165,12 +165,12 @@ export function OrderForm({ kwtId, kwtSlug, products }: Props) {
               required
               value={buyerName}
               onChange={(e) => setBuyerName(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              className="field"
               placeholder="Nama pembeli"
             />
           </div>
           <div>
-            <label htmlFor="buyerPhone" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="buyerPhone" className="field-label">
               Nomor WhatsApp
             </label>
             <input
@@ -179,26 +179,26 @@ export function OrderForm({ kwtId, kwtSlug, products }: Props) {
               inputMode="tel"
               value={buyerPhone}
               onChange={(e) => setBuyerPhone(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              className="field"
               placeholder="081234567890"
             />
           </div>
         </div>
         <div className="mt-3">
-          <label htmlFor="note" className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor="note" className="field-label">
             Catatan <span className="text-slate-400">(opsional)</span>
           </label>
           <input
             id="note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            className="field"
             placeholder="Mis. ambil sore setelah maghrib"
           />
         </div>
       </div>
 
-      <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 lg:sticky lg:top-4">
+      <aside className="card card-pad h-fit lg:sticky lg:top-20">
         <h3 className="flex items-center gap-2 font-semibold">
           <ShoppingBasket className="h-4 w-4 text-brand-600" /> Ringkasan
         </h3>
@@ -228,14 +228,12 @@ export function OrderForm({ kwtId, kwtSlug, products }: Props) {
           </span>
         </div>
 
-        {error && (
-          <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-        )}
+        {error && <p className="field-error mt-3">{error}</p>}
 
         <button
           type="submit"
           disabled={submitting || lines.length === 0}
-          className="mt-4 w-full rounded-xl bg-brand-600 py-3 font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn btn-primary btn-lg btn-block mt-4"
         >
           {submitting ? "Mengirim..." : `Pesan (${count} item)`}
         </button>
